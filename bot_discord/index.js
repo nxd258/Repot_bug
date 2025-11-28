@@ -30,7 +30,14 @@ client.once('ready', () => {
       );
       console.log('Đăng ký lệnh xong!');
     } catch (error) {
-      console.error(error);
+      if (error.code === 50001) {
+        console.log('\n⚠️  LỖI QUYỀN: Bot chưa có quyền đăng ký slash commands.');
+        console.log('📋 Vui lòng mời lại bot với link sau:');
+        console.log(`   https://discord.com/api/oauth2/authorize?client_id=${APPLICATION_ID}&permissions=2147483648&scope=bot%20applications.commands`);
+        console.log('\n✅ Bot vẫn đang online, chỉ slash commands chưa hoạt động.\n');
+      } else {
+        console.error(error);
+      }
     }
   })();
 });
