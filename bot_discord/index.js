@@ -52,7 +52,7 @@ client.login(DISCORD_BOT_TOKEN);
 
 // ---------------- EXPRESS KEEP-ALIVE ----------------
 const app = express();
-const PORT = 3000;
+const PORT = 5000;
 
 app.get("/", (req, res) => {
   res.send("Bot đang online 24/7!");
