@@ -23,21 +23,14 @@ client.once('ready', () => {
 
   (async () => {
     try {
-      console.log('Đang đăng ký lệnh cho server...');
+      console.log('Đang đăng ký lệnh globally...');
       await rest.put(
-        Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
+        Routes.applicationCommands(APPLICATION_ID),
         { body: commands }
       );
-      console.log('Đăng ký lệnh xong!');
+      console.log('Đăng ký lệnh xong! (Lệnh sẽ xuất hiện sau 1-2 phút)');
     } catch (error) {
-      if (error.code === 50001) {
-        console.log('\n⚠️  LỖI QUYỀN: Bot chưa có quyền đăng ký slash commands.');
-        console.log('📋 Vui lòng mời lại bot với link sau:');
-        console.log(`   https://discord.com/api/oauth2/authorize?client_id=${APPLICATION_ID}&permissions=2147483648&scope=bot%20applications.commands`);
-        console.log('\n✅ Bot vẫn đang online, chỉ slash commands chưa hoạt động.\n');
-      } else {
-        console.error(error);
-      }
+      console.error('Lỗi đăng ký lệnh:', error.message);
     }
   })();
 });
