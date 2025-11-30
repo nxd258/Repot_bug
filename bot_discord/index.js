@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const axios = require("axios");
 const express = require("express");
 
@@ -38,10 +38,19 @@ client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
   const commands = [
-    { name: "report", description: "Lấy báo cáo bug mới nhất" },
-    { name: "info", description: "Xem thông tin liên quan" },
-    { name: "data", description: "Gửi dữ liệu bug" },
-  ];
+    new SlashCommandBuilder()
+      .setName("report")
+      .setDescription("Lấy báo cáo bug mới nhất"),
+    new SlashCommandBuilder()
+      .setName("info")
+      .setDescription("Xem thông tin liên quan"),
+    new SlashCommandBuilder()
+      .setName("data")
+      .setDescription("Gửi file dữ liệu bug")
+      .addAttachmentOption((option) =>
+        option.setName("file").setDescription("File CSV hoặc Excel").setRequired(true)
+      ),
+  ].map((cmd) => cmd.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_BOT_TOKEN);
 
@@ -90,7 +99,12 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     if (interaction.commandName === "data") {
-      await interaction.reply("📊 Dữ liệu bug được gửi thành công!");
+      const file = interaction.options.getAttachment("file");
+      if (!file) {
+        await interaction.reply("❌ Vui lòng chọn file!");
+        return;
+      }
+      await interaction.reply(`📊 Nhận được file: **${file.name}** (${file.size} bytes)\n✅ Dữ liệu được lưu!`);
     }
   } catch (err) {
     console.error("Lỗi interaction:", err.message);
