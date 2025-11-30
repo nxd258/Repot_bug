@@ -4,9 +4,7 @@ const express = require("express");
 
 const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
-app.listen(5000, "0.0.0.0", () =>
-  console.log("Server keep-alive đang chạy trên port 5000"),
-);
+app.listen(5000, "0.0.0.0", () => console.log("Server keep-alive đang chạy trên port 5000"));
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
@@ -16,7 +14,6 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
-// Đăng ký slash command
 client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
@@ -32,15 +29,12 @@ client.once("ready", async () => {
     await rest.put(Routes.applicationCommands(APPLICATION_ID), {
       body: commands,
     });
-    console.log(
-      "✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)",
-    );
+    console.log("✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)");
   } catch (err) {
     console.error("Lỗi đăng ký lệnh:", err);
   }
 });
 
-// Handle slash commands
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -61,7 +55,7 @@ client.on("interactionCreate", async (interaction) => {
 
     if (interaction.commandName === "info") {
       await interaction.reply(
-        "ℹ️ Link Google Sheet: https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0",
+        "ℹ️ Link Google Sheet: https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0"
       );
     }
   } catch (err) {
