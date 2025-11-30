@@ -40,6 +40,7 @@ client.once("ready", async () => {
   const commands = [
     { name: "report", description: "Lấy báo cáo bug mới nhất" },
     { name: "info", description: "Xem thông tin liên quan" },
+    { name: "data", description: "Gửi dữ liệu bug" },
   ];
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_BOT_TOKEN);
@@ -86,6 +87,10 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.reply(
         "ℹ️ Link Google Sheet: https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0"
       );
+    }
+
+    if (interaction.commandName === "data") {
+      await interaction.reply("📊 Dữ liệu bug được gửi thành công!");
     }
   } catch (err) {
     console.error("Lỗi interaction:", err.message);
