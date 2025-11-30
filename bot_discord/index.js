@@ -104,7 +104,22 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.reply("❌ Vui lòng chọn file!");
         return;
       }
-      await interaction.reply(`📊 Nhận được file: **${file.name}** (${file.size} bytes)\n✅ Dữ liệu được lưu!`);
+
+      await interaction.reply(`⏳ Đang gửi file ${file.name} lên Google Web App...`);
+
+      try {
+        const res = await axios.post(GAS_WEBHOOK_URL, {
+          cmd: "data",
+          fileUrl: file.url,
+        });
+
+        await interaction.editReply(
+          res.data.message || "✅ Dữ liệu được lưu!"
+        );
+      } catch (err) {
+        console.error(err);
+        await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
+      }
     }
   } catch (err) {
     console.error("Lỗi interaction:", err.message);
