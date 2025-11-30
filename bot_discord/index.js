@@ -14,6 +14,26 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
+// Hàm cắt text thành từng đoạn theo dòng (max 2000 ký tự mỗi đoạn)
+function splitMessage(text) {
+  const maxLength = 2000;
+  const messages = [];
+  const lines = text.split("\n");
+  let currentMessage = "";
+
+  for (const line of lines) {
+    if ((currentMessage + line + "\n").length > maxLength) {
+      if (currentMessage) messages.push(currentMessage.trim());
+      currentMessage = line + "\n";
+    } else {
+      currentMessage += line + "\n";
+    }
+  }
+
+  if (currentMessage) messages.push(currentMessage.trim());
+  return messages;
+}
+
 client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
@@ -46,11 +66,16 @@ client.on("interactionCreate", async (interaction) => {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data;
         if (!text) text = "❌ Không nhận được report từ GAS";
-        
-        if (text.length > 2000) {
-          text = text.substring(0, 1997) + "...";
+
+        const messages = splitMessage(text);
+
+        // Gửi message đầu tiên
+        await interaction.editReply(messages[0]);
+
+        // Gửi các message tiếp theo (nếu có)
+        for (let i = 1; i < messages.length; i++) {
+          await interaction.followUp(messages[i]);
         }
-        await interaction.editReply(text);
       } catch (err) {
         console.error(err);
         await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
