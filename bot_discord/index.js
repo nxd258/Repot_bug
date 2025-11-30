@@ -4,7 +4,9 @@ const express = require("express");
 
 const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
-app.listen(5000, "0.0.0.0", () => console.log("Server keep-alive đang chạy trên port 5000"));
+app.listen(5000, "0.0.0.0", () =>
+  console.log("Server keep-alive đang chạy trên port 5000"),
+);
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
@@ -30,7 +32,9 @@ client.once("ready", async () => {
     await rest.put(Routes.applicationCommands(APPLICATION_ID), {
       body: commands,
     });
-    console.log("✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)");
+    console.log(
+      "✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)",
+    );
   } catch (err) {
     console.error("Lỗi đăng ký lệnh:", err);
   }
