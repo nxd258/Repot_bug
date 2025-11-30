@@ -12,7 +12,11 @@ const GUILD_ID = process.env.GUILD_ID;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const GAS_WEBHOOK_URL = "https://script.google.com/macros/s/xxxxxxxxxxxx/exec";
+const GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
+
+// Khi user /report
+const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+
 
 // Đăng ký slash command
 client.once("ready", async () => {
