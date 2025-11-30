@@ -46,6 +46,10 @@ client.on("interactionCreate", async (interaction) => {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data;
         if (!text) text = "❌ Không nhận được report từ GAS";
+        
+        if (text.length > 2000) {
+          text = text.substring(0, 1997) + "...";
+        }
         await interaction.editReply(text);
       } catch (err) {
         console.error(err);
