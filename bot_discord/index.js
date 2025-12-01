@@ -6,6 +6,16 @@ const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
 app.listen(5000, "0.0.0.0", () => console.log("Server keep-alive đang chạy trên port 5000"));
 
+// Hàm self-ping để keep alive
+setInterval(async () => {
+  try {
+    const url = process.env.REPLIT_URL || "http://localhost:5000";
+    await axios.get(url);
+  } catch (err) {
+    // Ignore errors
+  }
+}, 4 * 60 * 1000); // Ping mỗi 4 phút
+
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
 const GUILD_ID = process.env.GUILD_ID;
