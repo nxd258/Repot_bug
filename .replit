@@ -46,3 +46,8 @@ externalPort = 3000
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd bot_discord && node index.js"]
+
+[userenv]
+
+[userenv.shared]
+GITHUB_TOKEN = "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"
