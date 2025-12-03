@@ -129,10 +129,10 @@ client.on("interactionCreate", async (interaction) => {
             value:
               "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
           },
-          {
+         {
   name: "2. Link download file CSV",
-  value: "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20RUM%2C%20TIKI%2C%20DU%2C%20HO%2C%20BOM%2C%20GA%2C%20LAZ%2C%20TARO%2C%20VAB%2C%20LMN%2C%20SB88%2C%20S88%2C%20NEON%2C%20ROOS%2C%20SHOP%2C%20Q88%2C%20TH01%29%0AAND%20created%20%3E%3D%20-18h%0AAND%20type%20%3D%20Bug%0AAND%20status%20%21%3D%20Resolved%0AORDER%20BY%20created%20DESC)"
-}
+  value: "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20R)
+
 ,
           {
             name: "3. Link data daily function",
