@@ -31,23 +31,25 @@ const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
 // Hàm cắt text dài thành từng đoạn nhỏ
-function splitMessage(text) {
-  const maxLength = 4000; // embed field max 1024 ký tự
-  const messages = [];
+const MAX_EMBED_LENGTH = 4000;
+
+function splitMessageByLine(text) {
   const lines = text.split("\n");
-  let current = "";
+  const parts = [];
+  let chunk = "";
 
   for (const line of lines) {
-    if ((current + line + "\n").length > maxLength) {
-      if (current) messages.push(current.trim());
-      current = line + "\n";
-    } else {
-      current += line + "\n";
+    if ((chunk + line + "\n").length > MAX_EMBED_LENGTH) {
+      parts.push(chunk.trim());
+      chunk = "";
     }
+    chunk += line + "\n";
   }
-  if (current) messages.push(current.trim());
-  return messages;
+
+  if (chunk) parts.push(chunk.trim());
+  return parts;
 }
+
 
 // Đăng ký slash commands
 client.once("ready", async () => {
