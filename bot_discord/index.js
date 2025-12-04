@@ -31,7 +31,6 @@ const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
 // Hàm cắt text dài thành từng đoạn nhỏ
-const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 export function splitMessagePreserveLinks(text: string, maxLength = 3500): string[] {
   if (!text) return [];
 
