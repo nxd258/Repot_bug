@@ -33,36 +33,22 @@ const GAS_WEBHOOK_URL =
 // Hàm cắt text dài thành từng đoạn nhỏ
 const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
-function splitMessagePreserveLinks(text) {
-  const MAX_EMBED_LENGTH = 3500;
-
-  // Loại bỏ xuống dòng trong title của link
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
-    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
-  });
-
-  // Regex mới, nhận đủ []() link và text thường
-  const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
-  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
-
+function splitMessageByLine(text, maxLen = 3500) {
+  const lines = text.split("\n");
   const parts = [];
-  let chunk = "";
+  let buffer = "";
 
-  for (const token of tokens) {
-    if ((chunk + token).length > MAX_EMBED_LENGTH) {
-      if (chunk) parts.push(chunk);
-      chunk = token;
-      if (token.length > MAX_EMBED_LENGTH) {
-        const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
-        parts.push(...subParts.slice(0, -1));
-        chunk = subParts[subParts.length - 1];
-      }
+  for (const line of lines) {
+    const lineWithBreak = line + "\n";
+    if ((buffer + lineWithBreak).length > maxLen) {
+      if (buffer) parts.push(buffer);
+      buffer = lineWithBreak;
     } else {
-      chunk += token;
+      buffer += lineWithBreak;
     }
   }
 
-  if (chunk) parts.push(chunk);
+  if (buffer) parts.push(buffer);
   return parts;
 }
 
