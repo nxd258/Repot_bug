@@ -31,45 +31,35 @@ const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
 // Hàm cắt text dài thành từng đoạn nhỏ
-const MAX_EMBED_LENGTH = 3000;
+const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
-function splitMessageMarkdownSafe(text) {
-  const items = text.split(/• /).map(s => s.trim()).filter(Boolean);
+function splitMessagePreserveLinks(text) {
+  const regex = /(\[.*?\]\(.*?\))|([^\[]+)/gs;
+  // regex này tách ra link Markdown và text bình thường
+  const tokens = [...text.matchAll(regex)].map(m => m[0]);
+
   const parts = [];
   let chunk = "";
 
-  for (const item of items) {
-    let line = "• " + item + "\n";
-
-    if (line.length > MAX_EMBED_LENGTH) {
-      // Trường hợp bullet quá dài, cắt an toàn sau Markdown link
-      const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
-      let lastIndex = 0;
-      let safeChunk = "";
-
-      let match;
-      while ((match = regex.exec(line)) !== null) {
-        if ((safeChunk + line.slice(lastIndex, match.index + match[0].length)).length > MAX_EMBED_LENGTH) {
-          parts.push(safeChunk);
-          safeChunk = "";
-        }
-        safeChunk += line.slice(lastIndex, match.index + match[0].length);
-        lastIndex = match.index + match[0].length;
+  for (const token of tokens) {
+    if ((chunk + token).length > MAX_EMBED_LENGTH) {
+      if (chunk) parts.push(chunk);
+      chunk = token;
+      if (token.length > MAX_EMBED_LENGTH) {
+        // token quá dài, cắt an toàn theo ký tự nhưng đây là trường hợp cực hiếm
+        const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
+        parts.push(...subParts.slice(0, -1));
+        chunk = subParts[subParts.length - 1];
       }
-      safeChunk += line.slice(lastIndex);
-      parts.push(safeChunk);
-      chunk = "";
-    } else if ((chunk + line).length > MAX_EMBED_LENGTH) {
-      if (chunk) parts.push(chunk.trim());
-      chunk = line;
     } else {
-      chunk += line;
+      chunk += token;
     }
   }
 
-  if (chunk) parts.push(chunk.trim());
+  if (chunk) parts.push(chunk);
   return parts;
 }
+
 
 
 
