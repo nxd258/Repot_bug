@@ -33,22 +33,25 @@ const GAS_WEBHOOK_URL =
 // Hàm cắt text dài thành từng đoạn nhỏ
 const MAX_EMBED_LENGTH = 4000;
 
-function splitMessageByLine(text) {
-  const lines = text.split("\n");
+function splitMessageSafe(text) {
+  const items = text.split(/• /).map(s => s.trim()).filter(Boolean);
   const parts = [];
   let chunk = "";
 
-  for (const line of lines) {
-    if ((chunk + line + "\n").length > MAX_EMBED_LENGTH) {
-      parts.push(chunk.trim());
-      chunk = "";
+  for (const item of items) {
+    const line = "• " + item + "\n";
+    if ((chunk + line).length > MAX_EMBED_LENGTH) {
+      if (chunk) parts.push(chunk.trim());
+      chunk = line;
+    } else {
+      chunk += line;
     }
-    chunk += line + "\n";
   }
 
   if (chunk) parts.push(chunk.trim());
   return parts;
 }
+
 
 
 // Đăng ký slash commands
