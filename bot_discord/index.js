@@ -33,14 +33,33 @@ const GAS_WEBHOOK_URL =
 // Hàm cắt text dài thành từng đoạn nhỏ
 const MAX_EMBED_LENGTH = 4000;
 
-function splitMessageSafe(text) {
+function splitMessageMarkdownSafe(text) {
   const items = text.split(/• /).map(s => s.trim()).filter(Boolean);
   const parts = [];
   let chunk = "";
 
   for (const item of items) {
-    const line = "• " + item + "\n";
-    if ((chunk + line).length > MAX_EMBED_LENGTH) {
+    let line = "• " + item + "\n";
+
+    if (line.length > MAX_EMBED_LENGTH) {
+      // Trường hợp bullet quá dài, cắt an toàn sau Markdown link
+      const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+      let lastIndex = 0;
+      let safeChunk = "";
+
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        if ((safeChunk + line.slice(lastIndex, match.index + match[0].length)).length > MAX_EMBED_LENGTH) {
+          parts.push(safeChunk);
+          safeChunk = "";
+        }
+        safeChunk += line.slice(lastIndex, match.index + match[0].length);
+        lastIndex = match.index + match[0].length;
+      }
+      safeChunk += line.slice(lastIndex);
+      parts.push(safeChunk);
+      chunk = "";
+    } else if ((chunk + line).length > MAX_EMBED_LENGTH) {
       if (chunk) parts.push(chunk.trim());
       chunk = line;
     } else {
@@ -51,6 +70,7 @@ function splitMessageSafe(text) {
   if (chunk) parts.push(chunk.trim());
   return parts;
 }
+
 
 
 
