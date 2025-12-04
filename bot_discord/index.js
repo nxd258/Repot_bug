@@ -31,34 +31,42 @@ const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
 // Hàm cắt text dài thành từng đoạn nhỏ
-const MAX_EMBED_LENGTH = 3500; 
-export function splitMessagePreserveLinks(text: string, maxLength = 3500): string[] {
-  if (!text) return [];
+const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
-  // Xóa xuống dòng trong link để tránh break Markdown
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, url) => {
+function splitMessagePreserveLinks(text) {
+  const MAX_EMBED_LENGTH = 3500;
+
+  // Loại bỏ xuống dòng trong title của link
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
-  const lines = text.split("\n");
-  const parts: string[] = [];
-  let buffer = "";
+  // Regex mới, nhận đủ []() link và text thường
+  const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
+  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
-  for (const line of lines) {
-    const lineWithBreak = line + "\n";
+  const parts = [];
+  let chunk = "";
 
-    // Nếu thêm dòng này vượt maxLength, push buffer trước
-    if ((buffer + lineWithBreak).length > maxLength) {
-      if (buffer) parts.push(buffer);
-      buffer = lineWithBreak;
+  for (const token of tokens) {
+    if ((chunk + token).length > MAX_EMBED_LENGTH) {
+      if (chunk) parts.push(chunk);
+      chunk = token;
+      if (token.length > MAX_EMBED_LENGTH) {
+        const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
+        parts.push(...subParts.slice(0, -1));
+        chunk = subParts[subParts.length - 1];
+      }
     } else {
-      buffer += lineWithBreak;
+      chunk += token;
     }
   }
 
-  if (buffer) parts.push(buffer);
+  if (chunk) parts.push(chunk);
   return parts;
 }
+
+
 
 
 // Đăng ký slash commands
