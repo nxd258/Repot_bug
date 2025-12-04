@@ -32,7 +32,7 @@ const GAS_WEBHOOK_URL =
 
 // Hàm cắt text dài thành từng đoạn nhỏ
 function splitMessage(text) {
-  const maxLength = 1024; // embed field max 1024 ký tự
+  const maxLength = 4000; // embed field max 1024 ký tự
   const messages = [];
   const lines = text.split("\n");
   let current = "";
