@@ -34,66 +34,30 @@ const GAS_WEBHOOK_URL =
 export function splitMessagePreserveLinks(text: string, maxLength = 3500): string[] {
   if (!text) return [];
 
-  // Cleanup: Xử lý xuống dòng trong title link như code cũ của bạn
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
+  // Xóa xuống dòng trong link để tránh break Markdown
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, url) => {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
+  const lines = text.split("\n");
   const parts: string[] = [];
-  let currentChunk = "";
-  
-  // Regex đơn giản để bắt markdown link
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  
-  let lastIndex = 0;
-  let match;
-  const tokens: string[] = [];
+  let buffer = "";
 
-  // Tokenize: Tách text và link ra riêng biệt
-  while ((match = linkRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      tokens.push(text.substring(lastIndex, match.index)); // Text trước link
+  for (const line of lines) {
+    const lineWithBreak = line + "\n";
+
+    // Nếu thêm dòng này vượt maxLength, push buffer trước
+    if ((buffer + lineWithBreak).length > maxLength) {
+      if (buffer) parts.push(buffer);
+      buffer = lineWithBreak;
+    } else {
+      buffer += lineWithBreak;
     }
-    tokens.push(match[0]); // Bản thân cái link
-    lastIndex = linkRegex.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    tokens.push(text.substring(lastIndex)); // Text còn lại
   }
 
-  // Ghép token vào chunk
-  for (const token of tokens) {
-    if ((currentChunk + token).length > maxLength) {
-      if (currentChunk) {
-        parts.push(currentChunk);
-        currentChunk = "";
-      }
-
-      // Chỉ cắt nhỏ nếu bản thân token quá dài (hiếm khi xảy ra với link)
-      if (token.length > maxLength) {
-        let remainingToken = token;
-        while (remainingToken.length > 0) {
-          const slice = remainingToken.substring(0, maxLength);
-          if (remainingToken.length > maxLength) {
-             parts.push(slice);
-             remainingToken = remainingToken.substring(maxLength);
-          } else {
-             currentChunk = slice;
-            remainingToken = "";
+  if (buffer) parts.push(buffer);
+  return parts;
 }
-}
-} else {
-currentChunk = token;
-}
-} else {
-currentChunk += token;
-}
-}
-
-if (currentChunk) parts.push(currentChunk);
-return parts;
-}
-
 
 
 // Đăng ký slash commands
