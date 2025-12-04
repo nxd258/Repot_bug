@@ -34,9 +34,16 @@ const GAS_WEBHOOK_URL =
 const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
 function splitMessagePreserveLinks(text) {
-  const regex = /(\[.*?\]\(.*?\))|([^\[]+)/gs;
-  // regex này tách ra link Markdown và text bình thường
-  const tokens = [...text.matchAll(regex)].map(m => m[0]);
+  const MAX_EMBED_LENGTH = 3500;
+
+  // Loại bỏ xuống dòng trong title của link
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
+    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
+  });
+
+  // Regex mới, nhận đủ []() link và text thường
+  const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
+  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
   const parts = [];
   let chunk = "";
@@ -46,7 +53,6 @@ function splitMessagePreserveLinks(text) {
       if (chunk) parts.push(chunk);
       chunk = token;
       if (token.length > MAX_EMBED_LENGTH) {
-        // token quá dài, cắt an toàn theo ký tự nhưng đây là trường hợp cực hiếm
         const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
         parts.push(...subParts.slice(0, -1));
         chunk = subParts[subParts.length - 1];
@@ -59,7 +65,6 @@ function splitMessagePreserveLinks(text) {
   if (chunk) parts.push(chunk);
   return parts;
 }
-
 
 
 
