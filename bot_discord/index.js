@@ -6,7 +6,7 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 const axios = require("axios");
-const express = require("express");
+const express = require = require("express");
 
 const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
@@ -47,37 +47,34 @@ function splitMessagePreserveLinks(text) {
     // Tách chính xác tại điểm bắt đầu của mục "II. Report test tính năng các brands:"
     // ==============================================
     
-    // Regex tìm kiếm điểm bắt đầu của "II. Report test tính năng các brands:" (có thể có dấu xuống dòng hoặc đầu chuỗi)
-    // Sử dụng biểu thức chính quy chi tiết để tránh nhầm lẫn.
-    const sectionTwoStartRegex = /(\n|^)\s*II\.\s*Report test tính năng các brands:/;
-    const sectionTwoMatch = text.match(sectionTwoStartRegex);
+    // Tìm kiếm chuỗi cụ thể làm điểm chia
+    const splitMarker = 'II. Report test tính năng các brands:';
+    const splitIndex = text.indexOf(splitMarker);
 
     let headerPart = '';
     let mainContent = text;
 
-    if (sectionTwoMatch) {
-        // Vị trí bắt đầu của match (bao gồm \n hoặc ^)
-        const matchStart = sectionTwoMatch.index;
+    if (splitIndex !== -1) {
+        // Header là nội dung từ đầu đến ngay trước splitMarker. 
+        headerPart = text.substring(0, splitIndex).trim(); 
         
-        // Header là nội dung từ đầu đến ngay trước matchStart. Trim để loại bỏ khoảng trắng dư thừa
-        headerPart = text.substring(0, matchStart).trim();
-        
-        // Main content bắt đầu từ matchStart và được trimStart()
-        mainContent = text.substring(matchStart).trimStart();
+        // Main content bắt đầu từ splitMarker.
+        mainContent = text.substring(splitIndex).trimStart();
     } 
-    // Nếu không tìm thấy điểm chia, toàn bộ text sẽ là mainContent, và headerPart rỗng.
     
+  	// Nếu không tìm thấy điểm chia, headerPart rỗng và mainContent là toàn bộ text
+  	
     // FIX 2: Regex mới, nhận đủ []() link và text thường
     const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
     const tokens = [...mainContent.matchAll(regex)].map((m) => m[0]);
 
     const parts = [];
     
-    // Đảm bảo Header luôn là phần tử đầu tiên (Trang 0)
+    // Đảm bảo Header luôn là phần tử đầu tiên (Trang 0) nếu có nội dung
     if (headerPart.length > 0) {
         parts.push(headerPart);
     } else if (tokens.length === 0) {
-        // Nếu không có header và main content cũng rỗng (empty report), parts cũng rỗng
+        // Trường hợp report rỗng
         return parts;
     }
 
