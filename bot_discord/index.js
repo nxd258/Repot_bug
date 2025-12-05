@@ -38,14 +38,14 @@ function splitMessagePreserveLinks(text) {
   const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
 
   // FIX 1: Loại bỏ xuống dòng trong title của link
-  // Sử dụng (.+?) thay vì ([^\]]+) để cho phép ký tự ] trong title
-  text = text.replace(/\[(.+?)\]\(([^)]+)\)/gs, (m, t, url) => {
+  // SỬA: Dùng (.*?) thay vì (.+?) để tăng tính ổn định khi tiêu đề link phức tạp (có dấu ] hoặc [ bên trong)
+  text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
   // FIX 2: Regex mới, nhận đủ []() link và text thường
-  // Sử dụng (.+?) thay vì ([^\]]+) trong phần khớp link
-  const regex = /(\[.+?\]\([^)]+\))|([^\[]+)/gs;
+  // SỬA: Dùng (.*?) thay vì (.+?) cho tiêu đề link
+  const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
   const parts = [];
