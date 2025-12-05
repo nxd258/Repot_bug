@@ -37,24 +37,48 @@ function splitMessagePreserveLinks(text) {
   // Sử dụng hằng số an toàn đã định nghĩa
   const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
 
-  // FIX 1: Loại bỏ xuống dòng trong title của link
-  // SỬA: Dùng (.*?) thay vì (.+?) để tăng tính ổn định khi tiêu đề link phức tạp (có dấu ] hoặc [ bên trong)
+  // FIX 1: Loại bỏ xuống dòng trong title của link và sử dụng non-greedy match
   text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
   // FIX 2: Regex mới, nhận đủ []() link và text thường
-  // SỬA: Dùng (.*?) thay vì (.+?) cho tiêu đề link
+  // Sử dụng (.*?) cho tiêu đề link
   const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
   const parts = [];
   let chunk = "";
 
-  for (const token of tokens) {
+  // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
+  for (let i = 0; i < tokens.length; i++) {
+    let token = tokens[i]; // Use 'let' for potential modification
+    
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
-      if (chunk) parts.push(chunk);
-      chunk = token;
+      if (chunk) {
+        // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
+        // Kiểm tra xem chunk có kết thúc bằng ký hiệu danh sách không (\n + space + •/*/-)
+        // và token tiếp theo có phải là nội dung danh sách (bắt đầu bằng link '[')
+        const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
+        const match = chunk.match(listPrefixRegex);
+        
+        if (match && token.startsWith('[')) {
+          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
+          const prefix = match[0];
+          
+          // Cắt phần tiền tố khỏi chunk (trang cũ)
+          chunk = chunk.slice(0, chunk.length - prefix.length);
+          
+          // Chuyển phần tiền tố lên đầu token (trang mới)
+          token = prefix + token;
+          tokens[i] = token; // Cập nhật token trong mảng
+        }
+        
+        parts.push(chunk);
+      }
+      
+      chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
+      
       // Xử lý trường hợp một token (ví dụ: một link rất dài) vẫn vượt quá giới hạn
       if (token.length > MAX_CHUNK_LENGTH) {
         const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
