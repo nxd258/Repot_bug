@@ -42,56 +42,89 @@ function splitMessagePreserveLinks(text) {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
-  // FIX 2: Regex mới, nhận đủ []() link và text thường
-  // Sử dụng (.*?) cho tiêu đề link
-  const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
-  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
+    // ==============================================
+    // LOGIC MỚI: Tách phần Header/Summary ra embed đầu tiên (Trang 0)
+    // Dựa vào việc tìm kiếm điểm bắt đầu của mục "II."
+    // ==============================================
+    
+    // Regex tìm kiếm một dòng mới theo sau bởi "II." và khoảng trắng
+    const sectionTwoStartRegex = /(\n\s*II\.\s*)/;
+    const sectionTwoMatch = text.match(sectionTwoStartRegex);
 
-  const parts = [];
-  let chunk = "";
+    let headerPart = '';
+    let mainContent = text;
+    let splitIndex = -1;
 
-  // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
-  for (let i = 0; i < tokens.length; i++) {
-    let token = tokens[i]; // Use 'let' for potential modification
-    
-    if ((chunk + token).length > MAX_CHUNK_LENGTH) {
-      if (chunk) {
-        // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
-        // Kiểm tra xem chunk có kết thúc bằng ký hiệu danh sách không (\n + space + •/*/-)
-        // và token tiếp theo có phải là nội dung danh sách (bắt đầu bằng link '[')
-        const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
-        const match = chunk.match(listPrefixRegex);
+    if (sectionTwoMatch) {
+        // Vị trí bắt đầu của "\nII."
+        splitIndex = text.indexOf(sectionTwoMatch[0]);
+        
+        // Header là nội dung từ đầu đến ngay trước "\nII."
+        headerPart = text.substring(0, splitIndex).trim();
+        
+        // Main content bắt đầu từ "\nII."
+        mainContent = text.substring(splitIndex).trimStart();
+    } else {
+        // Fallback: Nếu không tìm thấy "II.", dùng logic cũ là tìm bullet point đầu tiên.
+        const headerSplitRegex = /(\n\s*[\-\*•]\s*)/;
+        const match = text.match(headerSplitRegex);
+        
+        if (match) {
+            splitIndex = text.indexOf(match[0]);
+            headerPart = text.substring(0, splitIndex).trim();
+            mainContent = text.substring(splitIndex).trimStart();
+        }
+        // Nếu không tìm thấy điểm chia, toàn bộ text sẽ là mainContent và headerPart rỗng.
+    }
+    
+    // FIX 2: Regex mới, nhận đủ []() link và text thường
+    const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
+    const tokens = [...mainContent.matchAll(regex)].map((m) => m[0]);
+
+    const parts = [];
+    
+    // Đảm bảo Header luôn là phần tử đầu tiên (Trang 0)
+    if (headerPart.length > 0) {
+        parts.push(headerPart);
+    }
+
+    let chunk = "";
+
+    // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
+    for (let i = 0; i < tokens.length; i++) {
+        let token = tokens[i]; // Use 'let' for potential modification
         
-        if (match && token.startsWith('[')) {
-          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
-          const prefix = match[0];
-          
-          // Cắt phần tiền tố khỏi chunk (trang cũ)
-          chunk = chunk.slice(0, chunk.length - prefix.length);
-          
-          // Chuyển phần tiền tố lên đầu token (trang mới)
-          token = prefix + token;
-          tokens[i] = token; // Cập nhật token trong mảng
+        if ((chunk + token).length > MAX_CHUNK_LENGTH) {
+            if (chunk) {
+                // LOGIC CHỐNG TÁCH BULLET POINT: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
+                const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
+                const match = chunk.match(listPrefixRegex);
+                
+                if (match && token.startsWith('[')) {
+                    const prefix = match[0];
+                    chunk = chunk.slice(0, chunk.length - prefix.length);
+                    token = prefix + token;
+                    tokens[i] = token; // Cập nhật token trong mảng
+                }
+                
+                parts.push(chunk);
+            }
+            
+            chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
+            
+            // Xử lý trường hợp một token vẫn vượt quá giới hạn
+            if (token.length > MAX_CHUNK_LENGTH) {
+                const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
+                parts.push(...subParts.slice(0, -1));
+                chunk = subParts[subParts.length - 1];
+            }
+        } else {
+            chunk += token;
         }
-        
-        parts.push(chunk);
-      }
-      
-      chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
-      
-      // Xử lý trường hợp một token (ví dụ: một link rất dài) vẫn vượt quá giới hạn
-      if (token.length > MAX_CHUNK_LENGTH) {
-        const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
-        parts.push(...subParts.slice(0, -1));
-        chunk = subParts[subParts.length - 1];
-      }
-    } else {
-      chunk += token;
     }
-  }
 
-  if (chunk) parts.push(chunk);
-  return parts;
+    if (chunk) parts.push(chunk);
+    return parts;
 }
 
 
@@ -143,7 +176,7 @@ client.on("interactionCreate", async (interaction) => {
     const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
     let text = res.data || "❌ Không nhận được report từ GAS";
 
-    // SỬ DỤNG HÀM CHUẨN ĐỂ CHIA TEXT, BẢO TOÀN LINKS
+    // SỬ DỤNG HÀM CHUẨN ĐỂ CHIA TEXT, BẢO TOÀN LINKS VÀ TÁCH HEADER
     const parts = splitMessagePreserveLinks(text); 
     
     // Discord Embed cho phép tối đa 4096 ký tự cho description, nhưng 
@@ -151,15 +184,16 @@ client.on("interactionCreate", async (interaction) => {
     // các lỗi nhỏ về byte.
 
     const embeds = parts.map((chunk, index) => ({
-      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+      // index 0 là header/tóm tắt, các index sau là trang 1, 2, 3... của phần chi tiết
+      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index}`,
       description: chunk,
       color: 0x00a2ff,
     }));
 
-    // Gửi embed đầu tiên
+    // Gửi embed đầu tiên (Header/Tóm tắt)
     await interaction.editReply({ embeds: [embeds[0]] });
 
-    // Gửi phần còn lại
+    // Gửi phần còn lại (Danh sách chi tiết)
     for (let i = 1; i < embeds.length; i++) {
       await interaction.followUp({ embeds: [embeds[i]] });
     }
