@@ -58,6 +58,9 @@ function splitMessagePreserveLinks(text) {
         // Header là nội dung từ đầu đến ngay trước splitMarker. 
         headerPart = text.substring(0, splitIndex).trim(); 
         
+        // FIX 3: Loại bỏ các ký tự Markdown thừa (** hoặc *) ở cuối headerPart để tránh lỗi hiển thị.
+        headerPart = headerPart.replace(/(\*\s*|\*{2}\s*|_+\s*)$/g, '').trim(); 
+
         // Main content bắt đầu từ splitMarker.
         mainContent = text.substring(splitIndex).trimStart();
         
@@ -77,14 +80,14 @@ function splitMessagePreserveLinks(text) {
             '@@1. Các brands đang có issue:@@'
         );
 
-        // Bolding 'MAY MẮN - PC'
+        // Bolding tên brands (VD: 'MAY MẮN - PC')
         // Sử dụng regex để bọc cụm từ 'MAY MẮN - PC'
         mainContent = mainContent.replace(
             /(MAY MẮN - PC)/, 
             '@@$1@@'
         );
         
-        // 2. Escape * và _ để đảm bảo các ký tự * và _ gốc không bị hiểu là Markdown
+        // 2. Escape * và _ để đảm bảo các ký tự * và _ gốc trong bug không bị hiểu là Markdown
         // và ngăn chặn lỗi in đậm/nghiêng không mong muốn
         mainContent = mainContent.replace(/\*/g, '\\*').replace(/_/g, '\\_');
         
