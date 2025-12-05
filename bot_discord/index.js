@@ -99,34 +99,34 @@ client.on("interactionCreate", async (interaction) => {
   try {
     // ===================== /report =====================
     if (interaction.commandName === "report") {
-      await interaction.reply("⏳ Đang lấy report...");
+  await interaction.reply("⏳ Đang lấy report...");
 
-      try {
-        const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-        let text = res.data || "❌ Không nhận được report từ GAS";
+  try {
+    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+    let text = res.data || "❌ Không nhận được report từ GAS";
 
-        // Chia văn bản thành các phần nhỏ hơn 3500 ký tự mỗi phần để gửi qua embed
-        const parts = splitMessagePreserveLinks(text);
+    // Chia văn bản thành các phần nhỏ hơn 3500 ký tự mỗi phần để gửi qua embed
+    const parts = splitMessagePreserveLinks(text);
 
-        const embeds = parts.map((chunk, index) => ({
-          title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
-          description: chunk,
-          color: 0x00a2ff,
-        }));
+    const embeds = parts.map((chunk, index) => ({
+      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+      description: chunk,
+      color: 0x00a2ff,
+    }));
 
-        // Gửi phần đầu tiên
-        await interaction.editReply({ embeds: [embeds[0]] });
+    // Gửi phần đầu tiên
+    await interaction.editReply({ embeds: [embeds[0]] });
 
-        // Gửi các phần tiếp theo
-        for (let i = 1; i < embeds.length; i++) {
-          await interaction.followUp({ embeds: [embeds[i]] });
-        }
-
-      } catch (err) {
-        console.error(err);
-        await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
-      }
+    // Gửi các phần tiếp theo
+    for (let i = 1; i < embeds.length; i++) {
+      await interaction.followUp({ embeds: [embeds[i]] });
     }
+
+  } catch (err) {
+    console.error(err);
+    await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+  }
+}
 
     // ===================== /info =====================
     if (interaction.commandName === "info") {
