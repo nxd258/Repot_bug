@@ -1,10 +1,4 @@
-const {
-  Client,
-  GatewayIntentBits,
-  REST,
-  Routes,
-  SlashCommandBuilder,
-} = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const axios = require("axios");
 const express = require("express");
 
@@ -34,14 +28,12 @@ const GAS_WEBHOOK_URL =
 const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
 function splitMessagePreserveLinks(text) {
-  const MAX_EMBED_LENGTH = 3500;
-
-  // Loại bỏ xuống dòng trong title của link
+  // Loại bỏ xuống dòng trong title của link để tránh lỗi
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
     return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
-  // Regex mới, nhận đủ []() link và text thường
+  // Regex để tách ra các thành phần text thường và các hyperlink
   const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
@@ -49,25 +41,25 @@ function splitMessagePreserveLinks(text) {
   let chunk = "";
 
   for (const token of tokens) {
+    // Kiểm tra nếu thêm token này vào chunk thì không vượt quá MAX_EMBED_LENGTH
     if ((chunk + token).length > MAX_EMBED_LENGTH) {
-      if (chunk) parts.push(chunk);
-      chunk = token;
+      if (chunk) parts.push(chunk); // Nếu chunk có dữ liệu thì đẩy vào parts
+      chunk = token; // Bắt đầu chunk mới từ token hiện tại
       if (token.length > MAX_EMBED_LENGTH) {
+        // Nếu token quá dài, chia nhỏ ra thành các phần nhỏ hơn MAX_EMBED_LENGTH
         const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
-        parts.push(...subParts.slice(0, -1));
-        chunk = subParts[subParts.length - 1];
+        parts.push(...subParts.slice(0, -1)); // Thêm tất cả các phần trừ phần cuối
+        chunk = subParts[subParts.length - 1]; // Phần cuối cùng có thể không cần chia thêm
       }
     } else {
-      chunk += token;
+      chunk += token; // Thêm token vào chunk nếu không vượt quá giới hạn
     }
   }
 
-  if (chunk) parts.push(chunk);
+  if (chunk) parts.push(chunk); // Nếu còn chunk chưa được đẩy vào parts thì đẩy nó vào
+
   return parts;
 }
-
-
-
 
 // Đăng ký slash commands
 client.once("ready", async () => {
@@ -108,40 +100,35 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     // ===================== /report =====================
-   if (interaction.commandName === "report") {
-  await interaction.reply("⏳ Đang lấy report...");
+    if (interaction.commandName === "report") {
+      await interaction.reply("⏳ Đang lấy report...");
 
-  try {
-    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-    let text = res.data || "❌ Không nhận được report từ GAS";
+      try {
+        const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+        let text = res.data || "❌ Không nhận được report từ GAS";
 
-    // 4096 ký tự cho mỗi embed
-    const MAX = 4096;
+        // Chia văn bản thành các phần nhỏ hơn 3500 ký tự mỗi phần để gửi qua embed
+        const parts = splitMessagePreserveLinks(text);
 
-    const parts = [];
-    for (let i = 0; i < text.length; i += MAX) {
-      parts.push(text.substring(i, i + MAX));
+        const embeds = parts.map((chunk, index) => ({
+          title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+          description: chunk,
+          color: 0x00a2ff,
+        }));
+
+        // Gửi phần đầu tiên
+        await interaction.editReply({ embeds: [embeds[0]] });
+
+        // Gửi các phần tiếp theo
+        for (let i = 1; i < embeds.length; i++) {
+          await interaction.followUp({ embeds: [embeds[i]] });
+        }
+
+      } catch (err) {
+        console.error(err);
+        await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+      }
     }
-
-    const embeds = parts.map((chunk, index) => ({
-      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
-      description: chunk,
-      color: 0x00a2ff,
-    }));
-
-    // Gửi embed đầu tiên
-    await interaction.editReply({ embeds: [embeds[0]] });
-
-    // Gửi phần còn lại
-    for (let i = 1; i < embeds.length; i++) {
-      await interaction.followUp({ embeds: [embeds[i]] });
-    }
-
-  } catch (err) {
-    console.error(err);
-    await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
-  }
-}
 
     // ===================== /info =====================
     if (interaction.commandName === "info") {
