@@ -43,7 +43,7 @@ function splitMessagePreserveLinks(text) {
   });
 
     // ==============================================
-    // LOGIC ĐÃ FIX: Tách phần Header/Summary ra embed đầu tiên (Trang 0)
+    // LOGIC: Tách phần Header/Summary ra embed đầu tiên (Trang 0)
     // Tách chính xác tại điểm bắt đầu của mục "II. Report test tính năng các brands:"
     // ==============================================
     
@@ -60,11 +60,44 @@ function splitMessagePreserveLinks(text) {
         
         // Main content bắt đầu từ splitMarker.
         mainContent = text.substring(splitIndex).trimStart();
+        
+        // --- LOGIC MỚI: BOLDING VÀ ESCAPE (DÙNG PLACEHOLDER) ---
+        
+        // 1. Dùng placeholder (@@) để bọc các phần cần in đậm
+        
+        // Bolding 'II. Report test tính năng các brands:'
+        mainContent = mainContent.replace(
+            'II. Report test tính năng các brands:', 
+            '@@II. Report test tính năng các brands:@@'
+        );
+
+        // Bolding '1. Các brands đang có issue:'
+        mainContent = mainContent.replace(
+            '1. Các brands đang có issue:', 
+            '@@1. Các brands đang có issue:@@'
+        );
+
+        // Bolding 'MAY MẮN - PC'
+        // Sử dụng regex để bọc cụm từ 'MAY MẮN - PC'
+        mainContent = mainContent.replace(
+            /(MAY MẮN - PC)/, 
+            '@@$1@@'
+        );
+        
+        // 2. Escape * và _ để đảm bảo các ký tự * và _ gốc không bị hiểu là Markdown
+        // và ngăn chặn lỗi in đậm/nghiêng không mong muốn
+        mainContent = mainContent.replace(/\*/g, '\\*').replace(/_/g, '\\_');
+        
+        // 3. Thay thế placeholder (@@) bằng dấu ** để kích hoạt in đậm cho các phần đã chọn
+        mainContent = mainContent.replace(/@@/g, '**');
+        
+        // --- END LOGIC MỚI ---
     } 
     
   	// Nếu không tìm thấy điểm chia, headerPart rỗng và mainContent là toàn bộ text
   	
     // FIX 2: Regex mới, nhận đủ []() link và text thường
+    // Cập nhật regex để vẫn nhận các link đã được sửa đổi ở FIX 1
     const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
     const tokens = [...mainContent.matchAll(regex)].map((m) => m[0]);
 
