@@ -28,12 +28,9 @@ const GAS_WEBHOOK_URL =
 const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
 function splitMessagePreserveLinks(text) {
-  // Loại bỏ xuống dòng trong title của link để tránh lỗi
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
-    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
-  });
+  const MAX_EMBED_LENGTH = 3500;
 
-  // Regex để tách ra các thành phần text thường và các hyperlink
+  // Regex để tách ra các phần text thường và các hyperlink mà không thay đổi cấu trúc của hyperlink
   const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
@@ -60,6 +57,7 @@ function splitMessagePreserveLinks(text) {
 
   return parts;
 }
+
 
 // Đăng ký slash commands
 client.once("ready", async () => {
