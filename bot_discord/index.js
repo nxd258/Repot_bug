@@ -56,6 +56,43 @@ function splitMessage(text) {
   return messages;
 }
 
+// Hàm để cắt text mà không làm hỏng Markdown hyperlink
+function cutTextSafe(text, maxLength = 1024) {
+  // Tìm tất cả các hyperlinks trong text
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+  let matches;
+  let linkParts = [];
+  
+  // Lưu các link tìm được
+  while ((matches = linkRegex.exec(text)) !== null) {
+    linkParts.push(matches[0]);
+  }
+
+  // Cắt văn bản sao cho không cắt ở giữa một link
+  let truncatedText = text.slice(0, maxLength);
+  let lastIndex = maxLength;
+  
+  // Kiểm tra xem nếu cắt văn bản quá dài, có thể làm mất link, cần cắt lại sao cho không mất link
+  linkParts.forEach((link) => {
+    const linkStart = truncatedText.indexOf(link);
+    const linkEnd = linkStart + link.length;
+
+    if (linkStart !== -1 && linkEnd <= maxLength) {
+      lastIndex = Math.max(lastIndex, linkEnd);
+    }
+  });
+
+  // Cắt văn bản lại đến lastIndex
+  truncatedText = text.slice(0, lastIndex);
+
+  // Nếu văn bản đã được cắt, thêm dấu ba chấm
+  if (truncatedText.length < text.length) {
+    truncatedText += "...";
+  }
+
+  return truncatedText;
+}
+
 client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
@@ -104,18 +141,41 @@ client.on("interactionCreate", async (interaction) => {
         let text = res.data;
         if (!text) text = "❌ Không nhận được report từ GAS";
 
+        // Split and process messages
         const messages = splitMessage(text);
 
-        // Gửi message đầu tiên
-        await interaction.editReply(messages[0]);
+        const brandNames = {}; // Add logic to populate this if necessary
+        const groupedIssues = {}; // Add logic to populate this if necessary
+        const fields = [];
 
-        // Gửi các message tiếp theo (nếu có)
-        for (let i = 1; i < messages.length; i++) {
-          await interaction.followUp(messages[i]);
-        }
+        // Example to push a brand's issue data to the fields
+        Object.keys(groupedIssues).forEach((prefix) => {
+          const issuesText = groupedIssues[prefix].join("\n");
+
+          // Push to fields ensuring we cut text safely
+          fields.push({
+            name: `🔸 ${brandNames[prefix]} (${groupedIssues[prefix].length} bugs)`,
+            value: cutTextSafe(issuesText), // Use cutTextSafe here
+          });
+        });
+
+        // Send embed message with fields
+        const embed = {
+          title: "📊 DAILY BUG REPORT",
+          color: 0x00a2ff,
+          fields: fields,
+          timestamp: new Date().toISOString(),
+        };
+
+        await interaction.editReply({ embeds: [embed] });
       } catch (err) {
-        console.error(err);
-        await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+        console.error("Lỗi khi gọi GAS hoặc xử lý report:", err);
+        try {
+          await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+        } catch (e) {
+          // ignore if editReply fails
+          console.error("editReply failed:", e);
+        }
       }
     }
 
@@ -129,12 +189,11 @@ client.on("interactionCreate", async (interaction) => {
             value:
               "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
           },
-         {
-  name: "2. Link download file CSV",
-  value:
-    "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20RUM%2C%20TIKI%2C%20DU%2C%20HO%2C%20BOM%2C%20GA%2C%20LAZ%2C%20TARO%2C%20VAB%2C%20LMN%2C%20SB88%2C%20S88%2C%20NEON%2C%20ROOS%2C%20SHOP%2C%20Q88%2C%20TH01%29%0AAND%20created%20%3E%3D%20-18h%0AAND%20type%20%3D%20Bug%0AAND%20status%20%21%3D%20Resolved%0AORDER%20BY%20created%20DESC)",
-},
-
+          {
+            name: "2. Link download file CSV",
+            value:
+              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20RUM%2C%20TIKI%2C%20DU%2C%20HO%2C%20BOM%2C%20GA%2C%20LAZ%2C%20TARO%2C%20VAB%2C%20LMN%2C%20SB88%2C%20S88%2C%20NEON%2C%20ROOS%2C%20SHOP%2C%20Q88%2C%20TH01%29%0AAND%20created%20%3E%3D%20-18h%0AAND%20type%20%3D%20Bug%0AAND%20status%20%21%3D%20Resolved%0AORDER%20BY%20created%20DESC)",
+          },
           {
             name: "3. Link data daily function",
             value:
