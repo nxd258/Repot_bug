@@ -133,51 +133,48 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    if (interaction.commandName === "report") {
-      await interaction.reply("⏳ Đang lấy report...");
+  if (interaction.commandName === "report") {
+  await interaction.reply("⏳ Đang lấy report...");
 
-      try {
-        const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-        let text = res.data;
-        if (!text) text = "❌ Không nhận được report từ GAS";
+  try {
+    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+    let text = res.data;
+    if (!text) text = "❌ Không nhận được report từ GAS";
 
-        // Split and process messages
-        const messages = splitMessage(text);
+    // Split và xử lý message
+    const messages = splitMessage(text);
 
-        const brandNames = {}; // Add logic to populate this if necessary
-        const groupedIssues = {}; // Add logic to populate this if necessary
-        const fields = [];
-
-        // Example to push a brand's issue data to the fields
-        Object.keys(groupedIssues).forEach((prefix) => {
-          const issuesText = groupedIssues[prefix].join("\n");
-
-          // Push to fields ensuring we cut text safely
-          fields.push({
-            name: `🔸 ${brandNames[prefix]} (${groupedIssues[prefix].length} bugs)`,
-            value: cutTextSafe(issuesText), // Use cutTextSafe here
-          });
-        });
-
-        // Send embed message with fields
-        const embed = {
-          title: "📊 DAILY BUG REPORT",
-          color: 0x00a2ff,
-          fields: fields,
-          timestamp: new Date().toISOString(),
-        };
-
-        await interaction.editReply({ embeds: [embed] });
-      } catch (err) {
-        console.error("Lỗi khi gọi GAS hoặc xử lý report:", err);
-        try {
-          await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
-        } catch (e) {
-          // ignore if editReply fails
-          console.error("editReply failed:", e);
-        }
-      }
+    // Tạo các field cho Embed
+    const fields = [];
+    for (const message of messages) {
+      fields.push({
+        name: "🔸 Report Part",
+        value: cutTextSafe(message, 1024), // Cắt phần text nếu quá dài
+      });
     }
+
+    // Tạo Embed với các phần nội dung
+    const embed = {
+      title: "📊 DAILY BUG REPORT",
+      color: 0x00a2ff,
+      fields: fields,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Gửi Embed
+    await interaction.editReply({ embeds: [embed] });
+
+  } catch (err) {
+    console.error("Lỗi khi gọi GAS hoặc xử lý report:", err);
+    try {
+      await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+    } catch (e) {
+      // ignore if editReply fails
+      console.error("editReply failed:", e);
+    }
+  }
+}
+
 
     if (interaction.commandName === "info") {
       const embed = {
