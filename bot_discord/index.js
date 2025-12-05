@@ -43,39 +43,29 @@ function splitMessagePreserveLinks(text) {
   });
 
     // ==============================================
-    // LOGIC MỚI: Tách phần Header/Summary ra embed đầu tiên (Trang 0)
-    // Dựa vào việc tìm kiếm điểm bắt đầu của mục "II."
+    // LOGIC ĐÃ FIX: Tách phần Header/Summary ra embed đầu tiên (Trang 0)
+    // Tách chính xác tại điểm bắt đầu của mục "II. Report test tính năng các brands:"
     // ==============================================
     
-    // Regex tìm kiếm một dòng mới theo sau bởi "II." và khoảng trắng
-    const sectionTwoStartRegex = /(\n\s*II\.\s*)/;
+    // Regex tìm kiếm điểm bắt đầu của "II. Report test tính năng các brands:" (có thể có dấu xuống dòng hoặc đầu chuỗi)
+    // Sử dụng biểu thức chính quy chi tiết để tránh nhầm lẫn.
+    const sectionTwoStartRegex = /(\n|^)\s*II\.\s*Report test tính năng các brands:/;
     const sectionTwoMatch = text.match(sectionTwoStartRegex);
 
     let headerPart = '';
     let mainContent = text;
-    let splitIndex = -1;
 
     if (sectionTwoMatch) {
-        // Vị trí bắt đầu của "\nII."
-        splitIndex = text.indexOf(sectionTwoMatch[0]);
+        // Vị trí bắt đầu của match (bao gồm \n hoặc ^)
+        const matchStart = sectionTwoMatch.index;
         
-        // Header là nội dung từ đầu đến ngay trước "\nII."
-        headerPart = text.substring(0, splitIndex).trim();
+        // Header là nội dung từ đầu đến ngay trước matchStart. Trim để loại bỏ khoảng trắng dư thừa
+        headerPart = text.substring(0, matchStart).trim();
         
-        // Main content bắt đầu từ "\nII."
-        mainContent = text.substring(splitIndex).trimStart();
-    } else {
-        // Fallback: Nếu không tìm thấy "II.", dùng logic cũ là tìm bullet point đầu tiên.
-        const headerSplitRegex = /(\n\s*[\-\*•]\s*)/;
-        const match = text.match(headerSplitRegex);
-        
-        if (match) {
-            splitIndex = text.indexOf(match[0]);
-            headerPart = text.substring(0, splitIndex).trim();
-            mainContent = text.substring(splitIndex).trimStart();
-        }
-        // Nếu không tìm thấy điểm chia, toàn bộ text sẽ là mainContent và headerPart rỗng.
-    }
+        // Main content bắt đầu từ matchStart và được trimStart()
+        mainContent = text.substring(matchStart).trimStart();
+    } 
+    // Nếu không tìm thấy điểm chia, toàn bộ text sẽ là mainContent, và headerPart rỗng.
     
     // FIX 2: Regex mới, nhận đủ []() link và text thường
     const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
@@ -86,11 +76,14 @@ function splitMessagePreserveLinks(text) {
     // Đảm bảo Header luôn là phần tử đầu tiên (Trang 0)
     if (headerPart.length > 0) {
         parts.push(headerPart);
+    } else if (tokens.length === 0) {
+        // Nếu không có header và main content cũng rỗng (empty report), parts cũng rỗng
+        return parts;
     }
 
     let chunk = "";
 
-    // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
+    // Bắt đầu chia nhỏ phần mainContent (II. trở đi)
     for (let i = 0; i < tokens.length; i++) {
         let token = tokens[i]; // Use 'let' for potential modification
         
@@ -179,6 +172,11 @@ client.on("interactionCreate", async (interaction) => {
     // SỬ DỤNG HÀM CHUẨN ĐỂ CHIA TEXT, BẢO TOÀN LINKS VÀ TÁCH HEADER
     const parts = splitMessagePreserveLinks(text); 
     
+    if (parts.length === 0) {
+        await interaction.editReply("📝 Report rỗng hoặc không có nội dung.");
+        return;
+    }
+
     // Discord Embed cho phép tối đa 4096 ký tự cho description, nhưng 
     // hàm splitMessagePreserveLinks sử dụng 3500 để an toàn và tránh 
     // các lỗi nhỏ về byte.
@@ -193,7 +191,7 @@ client.on("interactionCreate", async (interaction) => {
     // Gửi embed đầu tiên (Header/Tóm tắt)
     await interaction.editReply({ embeds: [embeds[0]] });
 
-    // Gửi phần còn lại (Danh sách chi tiết)
+    // Gửi phần còn lại (Danh sách chi tiết), bắt đầu từ index 1
     for (let i = 1; i < embeds.length; i++) {
       await interaction.followUp({ embeds: [embeds[i]] });
     }
