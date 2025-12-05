@@ -11,88 +11,65 @@ const express = require("express");
 const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
 app.listen(5000, "0.0.0.0", () =>
-  console.log("Server keep-alive đang chạy trên port 5000"),
+  console.log("Server keep-alive đang chạy trên port 5000")
 );
 
-// Hàm self-ping để keep alive
-setInterval(
-  async () => {
-    try {
-      const url = process.env.REPLIT_URL || "http://localhost:5000";
-      await axios.get(url);
-    } catch (err) {
-      // Ignore errors
-    }
-  },
-  4 * 60 * 1000,
-); // Ping mỗi 4 phút
+// Self-ping để giữ bot alive
+setInterval(async () => {
+  try {
+    const url = process.env.REPLIT_URL || "http://localhost:5000";
+    await axios.get(url);
+  } catch (err) {}
+}, 4 * 60 * 1000);
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
-const GUILD_ID = process.env.GUILD_ID;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
-// Hàm cắt text thành từng đoạn theo dòng (max 2000 ký tự mỗi đoạn)
-function splitMessage(text) {
-  const maxLength = 2000;
-  const messages = [];
-  const lines = text.split("\n");
-  let currentMessage = "";
+// Hàm cắt text dài thành từng đoạn nhỏ
+const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
-  for (const line of lines) {
-    if ((currentMessage + line + "\n").length > maxLength) {
-      if (currentMessage) messages.push(currentMessage.trim());
-      currentMessage = line + "\n";
-    } else {
-      currentMessage += line + "\n";
-    }
-  }
+function splitMessagePreserveLinks(text) {
+  const MAX_EMBED_LENGTH = 3500;
 
-  if (currentMessage) messages.push(currentMessage.trim());
-  return messages;
-}
-
-// Hàm để cắt text mà không làm hỏng Markdown hyperlink
-function cutTextSafe(text, maxLength = 1024) {
-  // Tìm tất cả các hyperlinks trong text
-  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
-  let matches;
-  let linkParts = [];
-  
-  // Lưu các link tìm được
-  while ((matches = linkRegex.exec(text)) !== null) {
-    linkParts.push(matches[0]);
-  }
-
-  // Cắt văn bản sao cho không cắt ở giữa một link
-  let truncatedText = text.slice(0, maxLength);
-  let lastIndex = maxLength;
-  
-  // Kiểm tra xem nếu cắt văn bản quá dài, có thể làm mất link, cần cắt lại sao cho không mất link
-  linkParts.forEach((link) => {
-    const linkStart = truncatedText.indexOf(link);
-    const linkEnd = linkStart + link.length;
-
-    if (linkStart !== -1 && linkEnd <= maxLength) {
-      lastIndex = Math.max(lastIndex, linkEnd);
-    }
+  // Loại bỏ xuống dòng trong title của link
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, url) => {
+    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
   });
 
-  // Cắt văn bản lại đến lastIndex
-  truncatedText = text.slice(0, lastIndex);
+  // Regex mới, nhận đủ []() link và text thường
+  const regex = /(\[[^\]]+\]\([^)]+\))|([^\[]+)/gs;
+  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
-  // Nếu văn bản đã được cắt, thêm dấu ba chấm
-  if (truncatedText.length < text.length) {
-    truncatedText += "...";
+  const parts = [];
+  let chunk = "";
+
+  for (const token of tokens) {
+    if ((chunk + token).length > MAX_EMBED_LENGTH) {
+      if (chunk) parts.push(chunk);
+      chunk = token;
+      if (token.length > MAX_EMBED_LENGTH) {
+        const subParts = token.match(new RegExp(`.{1,${MAX_EMBED_LENGTH}}`, "gs")) || [];
+        parts.push(...subParts.slice(0, -1));
+        chunk = subParts[subParts.length - 1];
+      }
+    } else {
+      chunk += token;
+    }
   }
 
-  return truncatedText;
+  if (chunk) parts.push(chunk);
+  return parts;
 }
 
+
+
+
+// Đăng ký slash commands
 client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
@@ -106,24 +83,21 @@ client.once("ready", async () => {
     new SlashCommandBuilder()
       .setName("data")
       .setDescription("Gửi file dữ liệu bug")
-      .addAttachmentOption((option) =>
-        option
+      .addAttachmentOption((op) =>
+        op
           .setName("file")
           .setDescription("File CSV hoặc Excel")
-          .setRequired(true),
+          .setRequired(true)
       ),
-  ].map((cmd) => cmd.toJSON());
+  ].map((c) => c.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_BOT_TOKEN);
-
   try {
     console.log("Đang đăng ký lệnh globally...");
     await rest.put(Routes.applicationCommands(APPLICATION_ID), {
       body: commands,
     });
-    console.log(
-      "✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)",
-    );
+    console.log("✅ Slash commands đã đăng ký!");
   } catch (err) {
     console.error("Lỗi đăng ký lệnh:", err);
   }
@@ -133,49 +107,43 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-  if (interaction.commandName === "report") {
+    // ===================== /report =====================
+   if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
   try {
     const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-    let text = res.data;
-    if (!text) text = "❌ Không nhận được report từ GAS";
+    let text = res.data || "❌ Không nhận được report từ GAS";
 
-    // Split và xử lý message
-    const messages = splitMessage(text);
+    // 4096 ký tự cho mỗi embed
+    const MAX = 4096;
 
-    // Tạo các field cho Embed
-    const fields = [];
-    for (const message of messages) {
-      fields.push({
-        name: "🔸 Report Part",
-        value: cutTextSafe(message, 1024), // Cắt phần text nếu quá dài
-      });
+    const parts = [];
+    for (let i = 0; i < text.length; i += MAX) {
+      parts.push(text.substring(i, i + MAX));
     }
 
-    // Tạo Embed với các phần nội dung
-    const embed = {
-      title: "📊 DAILY BUG REPORT",
+    const embeds = parts.map((chunk, index) => ({
+      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+      description: chunk,
       color: 0x00a2ff,
-      fields: fields,
-      timestamp: new Date().toISOString(),
-    };
+    }));
 
-    // Gửi Embed
-    await interaction.editReply({ embeds: [embed] });
+    // Gửi embed đầu tiên
+    await interaction.editReply({ embeds: [embeds[0]] });
+
+    // Gửi phần còn lại
+    for (let i = 1; i < embeds.length; i++) {
+      await interaction.followUp({ embeds: [embeds[i]] });
+    }
 
   } catch (err) {
-    console.error("Lỗi khi gọi GAS hoặc xử lý report:", err);
-    try {
-      await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
-    } catch (e) {
-      // ignore if editReply fails
-      console.error("editReply failed:", e);
-    }
+    console.error(err);
+    await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
 
-
+    // ===================== /info =====================
     if (interaction.commandName === "info") {
       const embed = {
         title: "ℹ️ DATA INFO",
@@ -189,7 +157,7 @@ client.on("interactionCreate", async (interaction) => {
           {
             name: "2. Link download file CSV",
             value:
-              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20RUM%2C%20TIKI%2C%20DU%2C%20HO%2C%20BOM%2C%20GA%2C%20LAZ%2C%20TARO%2C%20VAB%2C%20LMN%2C%20SB88%2C%20S88%2C%20NEON%2C%20ROOS%2C%20SHOP%2C%20Q88%2C%20TH01%29%0AAND%20created%20%3E%3D%20-18h%0AAND%20type%20%3D%20Bug%0AAND%20status%20%21%3D%20Resolved%0AORDER%20BY%20created%20DESC)",
+              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20(RBDA,RBMM,RBBK,RB18,RBCV,RBHG,RBTA88,RBTL,VOD,CHIV,XIT,BU88,KBET,AM,RUM,TIKI,DU,HO,BOM,GA,LAZ,TARO,VAB,LMN,SB88,S88,NEON,ROOS,SHOP,Q88,TH01)%20AND%20created%20%3E%3D%20-18h%20AND%20type%20%3D%20Bug%20AND%20status%20!%3D%20Resolved%20ORDER%20BY%20created%20DESC)",
           },
           {
             name: "3. Link data daily function",
@@ -204,6 +172,7 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.reply({ embeds: [embed] });
     }
 
+    // ===================== /data =====================
     if (interaction.commandName === "data") {
       const file = interaction.options.getAttachment("file");
       if (!file) {
@@ -212,7 +181,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       await interaction.reply(
-        `⏳ Đang gửi file ${file.name} lên Google Web App...`,
+        `⏳ Đang gửi file ${file.name} lên Google Web App...`
       );
 
       try {
