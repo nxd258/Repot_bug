@@ -232,10 +232,8 @@ if (interaction.commandName === "report") {
         // Gộp lại toàn bộ nội dung đã format
         const fullFormattedText = reportTitle + "\n" + mainReportContent;
 
-        // Phân đoạn text thành các tin nhắn dưới 2000 ký tự (giới hạn tin nhắn Discord)
-        const MAX_MESSAGE_LENGTH = 1990; // Dùng 1990 để an toàn
-        // Sử dụng Regex để chia thành các đoạn text
-        const parts = fullFormattedText.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
+        // SỬ DỤNG HÀM MỚI để chia thành các đoạn text, tránh cắt ngang link
+        const parts = splitMessageAvoidCuttingLinks(fullFormattedText);
 
         if (parts.length > 0) {
           // Gửi phần đầu tiên, DƯỚI DẠNG TIN NHẮN THƯỜNG
