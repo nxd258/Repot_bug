@@ -1,9 +1,9 @@
 const {
-  Client,
-  GatewayIntentBits,
-  REST,
-  Routes,
-  SlashCommandBuilder,
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  SlashCommandBuilder,
 } = require("discord.js");
 const axios = require("axios");
 const express = require("express");
@@ -11,168 +11,221 @@ const express = require("express");
 const app = express();
 app.get("/", (req, res) => res.send("Bot đang online 24/7!"));
 app.listen(5000, "0.0.0.0", () =>
-  console.log("Server keep-alive đang chạy trên port 5000"),
+  console.log("Server keep-alive đang chạy trên port 5000")
 );
 
-// Hàm self-ping để keep alive
-setInterval(
-  async () => {
-    try {
-      const url = process.env.REPLIT_URL || "http://localhost:5000";
-      await axios.get(url);
-    } catch (err) {
-      // Ignore errors
-    }
-  },
-  4 * 60 * 1000,
-); // Ping mỗi 4 phút
+// Self-ping để giữ bot alive
+setInterval(async () => {
+  try {
+    const url = process.env.REPLIT_URL || "http://localhost:5000";
+    await axios.get(url);
+  } catch (err) {}
+}, 4 * 60 * 1000);
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
-const GUILD_ID = process.env.GUILD_ID;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const GAS_WEBHOOK_URL =
-  "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
+  "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
-// Hàm cắt text thành từng đoạn theo dòng (max 2000 ký tự mỗi đoạn)
-function splitMessage(text) {
-  const maxLength = 2000;
-  const messages = [];
-  const lines = text.split("\n");
-  let currentMessage = "";
+// Hàm cắt text dài thành từng đoạn nhỏ, bảo toàn Markdown links
+const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
-  for (const line of lines) {
-    if ((currentMessage + line + "\n").length > maxLength) {
-      if (currentMessage) messages.push(currentMessage.trim());
-      currentMessage = line + "\n";
-    } else {
-      currentMessage += line + "\n";
-    }
-  }
+function splitMessagePreserveLinks(text) {
+  // Sử dụng hằng số an toàn đã định nghĩa
+  const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
 
-  if (currentMessage) messages.push(currentMessage.trim());
-  return messages;
+  // FIX 1: Loại bỏ xuống dòng trong title của link và sử dụng non-greedy match
+  text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
+    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
+  });
+
+  // FIX 2: Regex mới, nhận đủ []() link và text thường
+  // Sử dụng (.*?) cho tiêu đề link
+  const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
+  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
+
+  const parts = [];
+  let chunk = "";
+
+  // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
+  for (let i = 0; i < tokens.length; i++) {
+    let token = tokens[i]; // Use 'let' for potential modification
+    
+    if ((chunk + token).length > MAX_CHUNK_LENGTH) {
+      if (chunk) {
+        // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
+        // Kiểm tra xem chunk có kết thúc bằng ký hiệu danh sách không (\n + space + •/*/-)
+        // và token tiếp theo có phải là nội dung danh sách (bắt đầu bằng link '[')
+        const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
+        const match = chunk.match(listPrefixRegex);
+        
+        if (match && token.startsWith('[')) {
+          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
+          const prefix = match[0];
+          
+          // Cắt phần tiền tố khỏi chunk (trang cũ)
+          chunk = chunk.slice(0, chunk.length - prefix.length);
+          
+          // Chuyển phần tiền tố lên đầu token (trang mới)
+          token = prefix + token;
+          tokens[i] = token; // Cập nhật token trong mảng
+        }
+        
+        parts.push(chunk);
+      }
+      
+      chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
+      
+      // Xử lý trường hợp một token (ví dụ: một link rất dài) vẫn vượt quá giới hạn
+      if (token.length > MAX_CHUNK_LENGTH) {
+        const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
+        parts.push(...subParts.slice(0, -1));
+        chunk = subParts[subParts.length - 1];
+      }
+    } else {
+      chunk += token;
+    }
+  }
+
+  if (chunk) parts.push(chunk);
+  return parts;
 }
 
+
+
+
+// Đăng ký slash commands
 client.once("ready", async () => {
-  console.log(`Bot đã online: ${client.user.tag}`);
+  console.log(`Bot đã online: ${client.user.tag}`);
 
-  const commands = [
-    new SlashCommandBuilder()
-      .setName("report")
-      .setDescription("Lấy báo cáo bug mới nhất"),
-    new SlashCommandBuilder()
-      .setName("info")
-      .setDescription("Xem thông tin liên quan"),
-    new SlashCommandBuilder()
-      .setName("data")
-      .setDescription("Gửi file dữ liệu bug")
-      .addAttachmentOption((option) =>
-        option
-          .setName("file")
-          .setDescription("File CSV hoặc Excel")
-          .setRequired(true),
-      ),
-  ].map((cmd) => cmd.toJSON());
+  const commands = [
+    new SlashCommandBuilder()
+      .setName("report")
+      .setDescription("Lấy báo cáo bug mới nhất"),
+    new SlashCommandBuilder()
+      .setName("info")
+      .setDescription("Xem thông tin liên quan"),
+    new SlashCommandBuilder()
+      .setName("data")
+      .setDescription("Gửi file dữ liệu bug")
+      .addAttachmentOption((op) =>
+        op
+          .setName("file")
+          .setDescription("File CSV hoặc Excel")
+          .setRequired(true)
+      ),
+  ].map((c) => c.toJSON());
 
-  const rest = new REST({ version: "10" }).setToken(DISCORD_BOT_TOKEN);
-
-  try {
-    console.log("Đang đăng ký lệnh globally...");
-    await rest.put(Routes.applicationCommands(APPLICATION_ID), {
-      body: commands,
-    });
-    console.log(
-      "✅ Slash commands đã đăng ký! (Lệnh sẽ xuất hiện sau 1-2 phút)",
-    );
-  } catch (err) {
-    console.error("Lỗi đăng ký lệnh:", err);
-  }
+  const rest = new REST({ version: "10" }).setToken(DISCORD_BOT_TOKEN);
+  try {
+    console.log("Đang đăng ký lệnh globally...");
+    await rest.put(Routes.applicationCommands(APPLICATION_ID), {
+      body: commands,
+    });
+    console.log("✅ Slash commands đã đăng ký!");
+  } catch (err) {
+    console.error("Lỗi đăng ký lệnh:", err);
+  }
 });
 
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand()) return;
 
-  try {
-    if (interaction.commandName === "report") {
-      await interaction.reply("⏳ Đang lấy report...");
+  try {
+    // ===================== /report (ĐÃ SỬA DỤNG HÀM CHUẨN) =====================
+   if (interaction.commandName === "report") {
+  await interaction.reply("⏳ Đang lấy report...");
 
-      try {
-        const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-        let text = res.data;
-        if (!text) text = "❌ Không nhận được report từ GAS";
+  try {
+    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+    let text = res.data || "❌ Không nhận được report từ GAS";
 
-        const messages = splitMessage(text);
+    // SỬ DỤNG HÀM CHUẨN ĐỂ CHIA TEXT, BẢO TOÀN LINKS
+    const parts = splitMessagePreserveLinks(text); 
+    
+    // Discord Embed cho phép tối đa 4096 ký tự cho description, nhưng 
+    // hàm splitMessagePreserveLinks sử dụng 3500 để an toàn và tránh 
+    // các lỗi nhỏ về byte.
 
-        // Gửi message đầu tiên
-        await interaction.editReply(messages[0]);
+    const embeds = parts.map((chunk, index) => ({
+      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+      description: chunk,
+      color: 0x00a2ff,
+    }));
 
-        // Gửi các message tiếp theo (nếu có)
-        for (let i = 1; i < messages.length; i++) {
-          await interaction.followUp(messages[i]);
-        }
-      } catch (err) {
-        console.error(err);
-        await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
-      }
-    }
+    // Gửi embed đầu tiên
+    await interaction.editReply({ embeds: [embeds[0]] });
 
-    if (interaction.commandName === "info") {
-      const embed = {
-        title: "ℹ️ DATA INFO",
-        color: 3447003,
-        fields: [
-          {
-            name: "1. File data all bug",
-            value:
-              "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
-          },
-         {
-  name: "2. Link download file CSV",
-  value: "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20%28RBDA%2C%20RBMM%2C%20RBBK%2C%20RB18%2C%20RBCV%2C%20RBHG%2C%20RBTA88%2C%20RBTL%2C%20VOD%2C%20CHIV%2C%20XIT%2C%20BU88%2C%20KBET%2C%20AM%2C%20R)
+    // Gửi phần còn lại
+    for (let i = 1; i < embeds.length; i++) {
+      await interaction.followUp({ embeds: [embeds[i]] });
+    }
 
-,
-          {
-            name: "3. Link data daily function",
-            value:
-              "[Link](https://docs.google.com/spreadsheets/d/1KKnCq7666uE-Z-wE7JW0raE5OKh5dHKPX8eDlSGmlWs/edit?gid=476546611#gid=476546611)",
-          },
-        ],
-        footer: { text: "Team gửi info" },
-        timestamp: new Date().toISOString(),
-      };
+  } catch (err) {
+    console.error(err);
+    await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+  }
+}
 
-      await interaction.reply({ embeds: [embed] });
-    }
+    // ===================== /info =====================
+    if (interaction.commandName === "info") {
+      const embed = {
+        title: "ℹ️ DATA INFO",
+        color: 3447003,
+        fields: [
+          {
+            name: "1. File data all bug",
+            value:
+              "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
+          },
+          {
+            name: "2. Link download file CSV",
+            value:
+              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20(RBDA,RBMM,RBBK,RB18,RBCV,RBHG,RBTA88,RBTL,VOD,CHIV,XIT,BU88,KBET,AM,RUM,TIKI,DU,HO,BOM,GA,LAZ,TARO,VAB,LMN,SB88,S88,NEON,ROOS,SHOP,Q88,TH01)%20AND%20created%20%3E%3D%20-18h%20AND%20type%20%3D%20Bug%20AND%20status%20!%3D%20Resolved%20ORDER%20BY%20created%20DESC)",
+          },
+          {
+            name: "3. Link data daily function",
+            value:
+              "[Link](https://docs.google.com/spreadsheets/d/1KKnCq7666uE-Z-wE7JW0raE5OKh5dHKPX8eDlSGmlWs/edit?gid=476546611#gid=476546611)",
+          },
+        ],
+        footer: { text: "Team gửi info" },
+        timestamp: new Date().toISOString(),
+      };
 
-    if (interaction.commandName === "data") {
-      const file = interaction.options.getAttachment("file");
-      if (!file) {
-        await interaction.reply("❌ Vui lòng chọn file!");
-        return;
-      }
+      await interaction.reply({ embeds: [embed] });
+    }
 
-      await interaction.reply(
-        `⏳ Đang gửi file ${file.name} lên Google Web App...`,
-      );
+    // ===================== /data =====================
+    if (interaction.commandName === "data") {
+      const file = interaction.options.getAttachment("file");
+      if (!file) {
+        await interaction.reply("❌ Vui lòng chọn file!");
+        return;
+      }
 
-      try {
-        const res = await axios.post(GAS_WEBHOOK_URL, {
-          cmd: "data",
-          fileUrl: file.url,
-        });
+      await interaction.reply(
+        `⏳ Đang gửi file ${file.name} lên Google Web App...`
+      );
 
-        await interaction.editReply(res.data.message || "✅ Dữ liệu được lưu!");
-      } catch (err) {
-        console.error(err);
-        await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
-      }
-    }
-  } catch (err) {
-    console.error("Lỗi interaction:", err.message);
-  }
+      try {
+        const res = await axios.post(GAS_WEBHOOK_URL, {
+          cmd: "data",
+          fileUrl: file.url,
+        });
+
+        await interaction.editReply(res.data.message || "✅ Dữ liệu được lưu!");
+      } catch (err) {
+        console.error(err);
+        await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
+      }
+    }
+  } catch (err) {
+    console.error("Lỗi interaction:", err.message);
+  }
 });
 
 client.login(DISCORD_BOT_TOKEN);
