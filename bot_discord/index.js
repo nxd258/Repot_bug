@@ -30,11 +30,12 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
-// Hàm cắt text dài thành từng đoạn nhỏ, bảo toàn Markdown links
-const MAX_EMBED_LENGTH = 3500; // An toàn cho Embed
+// ====================================================================
+// Hàm 1: splitMessagePreserveLinks (Dành cho Embed - Giới hạn 3500)
+// ====================================================================
+const MAX_EMBED_LENGTH = 3500; 
 
 function splitMessagePreserveLinks(text) {
-  // Sử dụng hằng số an toàn đã định nghĩa
   const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
 
   // FIX 1: Loại bỏ xuống dòng trong title của link và sử dụng non-greedy match
@@ -43,16 +44,14 @@ function splitMessagePreserveLinks(text) {
   });
 
   // FIX 2: Regex mới, nhận đủ []() link và text thường
-  // Sử dụng (.*?) cho tiêu đề link
   const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
 
   const parts = [];
   let chunk = "";
 
-  // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
   for (let i = 0; i < tokens.length; i++) {
-    let token = tokens[i]; // Use 'let' for potential modification
+    let token = tokens[i];
     
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
       if (chunk) {
@@ -64,21 +63,64 @@ function splitMessagePreserveLinks(text) {
           const prefix = match[0];
           chunk = chunk.slice(0, chunk.length - prefix.length);
           token = prefix + token;
-          tokens[i] = token; // Cập nhật token trong mảng
+          tokens[i] = token; 
         }
         
         parts.push(chunk);
       }
       
-      chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
+      chunk = token;
       
-      // Xử lý trường hợp một token (ví dụ: một link rất dài) vẫn vượt quá giới hạn
+      // Xử lý trường hợp một token (link/text) quá dài
       if (token.length > MAX_CHUNK_LENGTH) {
         const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
         parts.push(...subParts.slice(0, -1));
         chunk = subParts[subParts.length - 1];
       }
     } else {
+      chunk += token;
+    }
+  }
+
+  if (chunk) parts.push(chunk);
+  return parts;
+}
+
+// ====================================================================
+// Hàm 2: splitMessageAvoidCuttingLinks (Dành cho Tin nhắn thường - Giới hạn 2000)
+// ====================================================================
+const MAX_DISCORD_MESSAGE_LENGTH = 1990; 
+
+function splitMessageAvoidCuttingLinks(text) {
+  const MAX_CHUNK_LENGTH = MAX_DISCORD_MESSAGE_LENGTH;
+
+  // 1. Chuẩn hóa link (loại bỏ xuống dòng trong title)
+  text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
+    return `[${t.replace(/\n/g, " ")}](${url.trim()})`;
+  });
+
+  // 2. Tách chuỗi thành các token: link hoặc text thường
+  const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
+  const tokens = [...text.matchAll(regex)].map((m) => m[0]);
+  
+  const parts = [];
+  let chunk = "";
+
+  for (const token of tokens) {
+    if ((chunk + token).length > MAX_CHUNK_LENGTH) {
+      
+      if (chunk) {
+        parts.push(chunk);
+      }
+      chunk = token;
+      
+      // Xử lý token quá dài (buộc phải cắt)
+      while (chunk.length > MAX_CHUNK_LENGTH) {
+        parts.push(chunk.substring(0, MAX_CHUNK_LENGTH));
+        chunk = chunk.substring(MAX_CHUNK_LENGTH);
+      }
+    } else {
+      // Thêm token vào chunk hiện tại
       chunk += token;
     }
   }
@@ -97,7 +139,7 @@ client.once("ready", async () => {
       .setName("report")
       .setDescription("Lấy báo cáo bug mới nhất (dạng Embed)"),
 // === BỔ SUNG LỆNH /report1 ===
-    new SlashCommandBuilder() 
+    new SlashCommandBuilder() 
       .setName("report1")
       .setDescription("Lấy báo cáo bug mới nhất (dạng Tin nhắn thường)"),
 // =============================
@@ -161,9 +203,9 @@ client.on("interactionCreate", async (interaction) => {
       let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
       
       // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ
-      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**');
-      cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
-      cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
+      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**');
+      cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
+      cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
       
       mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
 
@@ -195,7 +237,7 @@ if (interaction.commandName === "report") {
 
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: parts[0], 
+      description: parts[0], 
       color: 0x00a2ff,
     };
 
@@ -214,25 +256,30 @@ if (interaction.commandName === "report") {
     }
 
   } catch (err) {
-    console.error(err);
+    console.error("Lỗi khi xử lý /report:", err);
     await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
-    // ===================== /report1 (DẠNG TIN NHẮN THƯỜNG ĐÃ CÓ FORMAT) =====================
+    // ===================== /report1 (DẠNG TIN NHẮN THƯỜNG ĐÃ SỬA LỖI CẮT LINK) =====================
     if (interaction.commandName === "report1") {
       await interaction.reply("⏳ Đang lấy report (Tin nhắn thường)...");
-      
+      
       try {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data || "❌ Không nhận được report từ GAS";
 
+        if (text.startsWith("❌")) {
+            await interaction.editReply({ content: text });
+            return;
+        }
+
         // Xử lý format (in đậm tiêu đề, giữ hyperlink)
         const { reportTitle, mainReportContent } = processReportContent(text);
-        
+        
         // Gộp lại toàn bộ nội dung đã format
         const fullFormattedText = reportTitle + "\n" + mainReportContent;
 
-        // SỬ DỤNG HÀM MỚI để chia thành các đoạn text, tránh cắt ngang link
+        // **SỬ DỤNG HÀM CHIA CHUỖI AN TOÀN CHO TIN NHẮN THƯỜNG (1990)**
         const parts = splitMessageAvoidCuttingLinks(fullFormattedText);
 
         if (parts.length > 0) {
@@ -248,7 +295,7 @@ if (interaction.commandName === "report") {
         }
 
       } catch (err) {
-        console.error(err);
+        console.error("Lỗi khi xử lý /report1:", err);
         await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
       }
     }
@@ -301,12 +348,12 @@ if (interaction.commandName === "report") {
 
         await interaction.editReply(res.data.message || "✅ Dữ liệu được lưu!");
       } catch (err) {
-        console.error(err);
+        console.error("Lỗi khi xử lý /data:", err);
         await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
       }
     }
   } catch (err) {
-    console.error("Lỗi interaction:", err.message);
+    console.error("Lỗi interaction tổng thể:", err.message);
   }
 });
 
