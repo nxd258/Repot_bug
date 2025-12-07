@@ -34,9 +34,11 @@ const GAS_WEBHOOK_URL =
 // Hàm 1: splitMessagePreserveLinks (Dành cho Embed - Giới hạn 3500)
 // ====================================================================
 const MAX_EMBED_LENGTH = 3500; 
+// Giảm giới hạn kiểm tra cho Trang 0 để dành chỗ cho Title và mục I, tránh cắt lửng.
+const MAX_CHUNK_LENGTH_SAFE = 3450; 
 
 function splitMessagePreserveLinks(text) {
-  const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
+  const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH;
 
   // FIX 1: Loại bỏ xuống dòng trong title của link và sử dụng non-greedy match
   text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
@@ -53,9 +55,12 @@ function splitMessagePreserveLinks(text) {
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i];
     
-    if ((chunk + token).length > MAX_CHUNK_LENGTH) {
+    // Áp dụng giới hạn an toàn cho Chunk đầu tiên (Trang 0)
+    const currentLimit = (parts.length === 0) ? MAX_CHUNK_LENGTH_SAFE : MAX_CHUNK_LENGTH;
+    
+    if ((chunk + token).length > currentLimit) {
       if (chunk) {
-        // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
+        // LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng khỏi nội dung/link (Quan trọng cho tính nhất quán)
         const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
         const match = chunk.match(listPrefixRegex);
         
@@ -64,7 +69,20 @@ function splitMessagePreserveLinks(text) {
           chunk = chunk.slice(0, chunk.length - prefix.length);
           token = prefix + token;
           tokens[i] = token; 
-        }
+        } 
+        // **LOGIC ĐỂ ƯU TIÊN GIỮ KHỐI TIÊU ĐỀ (MỤC I, II) KHÔNG BỊ CẮT LỬNG:**
+        else if (token.includes('I.') || token.includes('II.')) { 
+            // Nếu token tiếp theo là tiêu đề mục I hoặc II (thường là token lớn),
+            // Cố gắng cắt tại vị trí xuống dòng gần nhất để đẩy toàn bộ mục đó xuống trang mới.
+            const lastNewline = chunk.lastIndexOf('\n');
+            if (lastNewline !== -1 && (currentLimit - lastNewline) < token.length + 50) {
+                // Nếu xuống dòng gần giới hạn, cắt tại đó
+                const remaining = chunk.substring(lastNewline).trim();
+                chunk = chunk.slice(0, lastNewline);
+                token = remaining + token;
+                tokens[i] = token;
+            }
+        }
         
         parts.push(chunk);
       }
@@ -72,8 +90,8 @@ function splitMessagePreserveLinks(text) {
       chunk = token;
       
       // Xử lý trường hợp một token (link/text) quá dài
-      if (token.length > MAX_CHUNK_LENGTH) {
-        const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
+      if (token.length > currentLimit) {
+        const subParts = token.match(new RegExp(`.{1,${currentLimit}}`, "gs")) || [];
         parts.push(...subParts.slice(0, -1));
         chunk = subParts[subParts.length - 1];
       }
