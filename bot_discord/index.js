@@ -149,20 +149,26 @@ client.on("interactionCreate", async (interaction) => {
     let reportTitle = "";
     let mainReportContent = text;
     
-    // Tìm vị trí bắt đầu của phần chi tiết bug
+    // Điểm neo chia nội dung
     const splitMarker = "II. Report test tính năng các brands:";
     const splitIndex = text.indexOf(splitMarker);
     
     if (splitIndex !== -1) {
-      // Nội dung từ đầu đến ngay trước 'II...' là Tiêu đề
+      // Nội dung từ đầu đến ngay trước 'II...' là Tiêu đề (Trang 0)
       reportTitle = text.substring(0, splitIndex).trim();
       
-      // Nội dung từ 'II...' trở đi là Nội dung chi tiết
+      // Nội dung từ 'II...' trở đi là Nội dung chi tiết (Trang 1)
       mainReportContent = text.substring(splitIndex).trim();
+
+      // Khắc phục: Sau khi cắt, đảm bảo không có ký tự Markdown dư thừa nào
+      // đang nằm ở đầu mainReportContent (ví dụ: các dấu *)
+      // Thêm logic loại bỏ các ký tự Markdown phổ biến ở đầu nếu có.
+      mainReportContent = mainReportContent.replace(/^[\s\r\n]*[*_`~]+/, '').trim();
     } else {
-      // Trường hợp không tìm thấy: Giữ nguyên toàn bộ nội dung là mainReportContent
+      // Fallback: Nếu không tìm thấy điểm cắt.
       reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
-      // mainReportContent = text; (Đã gán ở trên)
+      // Nếu không cắt được, ta vẫn cần đảm bảo phần text ban đầu không bị in đậm
+      mainReportContent = text.replace(/^[\s\r\n]*[*_`~]+/, '').trim();
     }
     
     // ----------------------------------------------------
@@ -201,7 +207,6 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
-
     // ===================== /info =====================
     if (interaction.commandName === "info") {
       const embed = {
