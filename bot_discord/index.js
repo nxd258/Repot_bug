@@ -143,23 +143,55 @@ client.on("interactionCreate", async (interaction) => {
     const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
     let text = res.data || "❌ Không nhận được report từ GAS";
 
-    // SỬ DỤNG HÀM CHUẨN ĐỂ CHIA TEXT, BẢO TOÀN LINKS
-    const parts = splitMessagePreserveLinks(text); 
-    
-    // Discord Embed cho phép tối đa 4096 ký tự cho description, nhưng 
-    // hàm splitMessagePreserveLinks sử dụng 3500 để an toàn và tránh 
-    // các lỗi nhỏ về byte.
+    // ----------------------------------------------------
+    // BƯỚC 1 & 2: Tách phần tiêu đề báo cáo ra khỏi nội dung chính
+    // Regex tìm phần tiêu đề: Bắt đầu từ 'DAILY BUG REPORT' hoặc 'Báo cáo bug hàng ngày'
+    // và kết thúc sau dòng 'I. Report access domain tối: Link' (hoặc ngay trước 'II. Report test...')
+    
+    const titleRegex = /^(DAILY BUG REPORT[\s\S]*?)(\n*I\. Report access domain tối: Link\s*\n*)/i;
+    let reportTitle = "";
+    let mainReportContent = text;
+    
+    const match = text.match(titleRegex);
 
-    const embeds = parts.map((chunk, index) => ({
-      title: index === 0 ? "📊 DAILY BUG REPORT" : `📄 Trang ${index + 1}`,
+    if (match) {
+      // match[1] là phần tiêu đề: 'DAILY BUG REPORT...' đến 'Team gửi Anh/Chị Report daily tối 07-12-2025:'
+      // match[2] là phần link domain: 'I. Report access domain tối: Link\n'
+      reportTitle = match[1] + match[2]; // Lấy trọn vẹn phần tiêu đề và link domain
+      mainReportContent = text.substring(match[0].length).trim(); // Phần còn lại là từ 'II. Report test...'
+    } else {
+      // Trường hợp không match được tiêu đề (hoặc cấu trúc thay đổi)
+      // Lấy 3 dòng đầu làm tiêu đề, phần còn lại là nội dung (chỉ là fallback)
+      const lines = text.split('\n');
+      reportTitle = lines.slice(0, 5).join('\n'); // Lấy đủ 5 dòng đầu (Tiêu đề, Ngày, Tổng bug, Team gửi, Link domain)
+      mainReportContent = lines.slice(5).join('\n').trim();
+    }
+    
+    // ----------------------------------------------------
+
+    // BƯỚC 3: Xử lý nội dung chính (từ 'II. Report test...')
+    const parts = splitMessagePreserveLinks(mainReportContent);
+
+    // Tạo Embed đầu tiên (Trang 0: Tiêu đề và Link Domain)
+    const firstEmbed = {
+      title: "📊 DAILY BUG REPORT",
+      description: reportTitle, // Sử dụng phần tiêu đề đã tách
+      color: 0x00a2ff,
+    };
+
+    // Tạo các Embed cho phần nội dung chi tiết (Từ Trang 1 trở đi)
+    const contentEmbeds = parts.map((chunk, index) => ({
+      title: `📄 Trang ${index + 1} - Chi tiết Bug`, // Bắt đầu từ trang 1
       description: chunk,
       color: 0x00a2ff,
     }));
 
-    // Gửi embed đầu tiên
+    const embeds = [firstEmbed, ...contentEmbeds]; // Gộp embed tiêu đề và các embed nội dung
+
+    // Gửi embed đầu tiên (Tiêu đề)
     await interaction.editReply({ embeds: [embeds[0]] });
 
-    // Gửi phần còn lại
+    // Gửi phần còn lại (Chi tiết Bug)
     for (let i = 1; i < embeds.length; i++) {
       await interaction.followUp({ embeds: [embeds[i]] });
     }
