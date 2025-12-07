@@ -144,46 +144,46 @@ if (interaction.commandName === "report") {
     let text = res.data || "❌ Không nhận được report từ GAS";
 
     // ----------------------------------------------------
-    // BƯỚC 1: Tìm điểm chia chính xác
+    // BƯỚC 1: Tách Tiêu đề (Trang 0) và Nội dung Chi tiết (Trang 1+)
     
     let reportTitle = "";
     let mainReportContent = text;
     
-    // Điểm neo chia nội dung chi tiết
     const splitMarker = "II. Report test tính năng các brands:";
     
-    // Regex tìm chính xác mẫu '**II. Report test tính năng các brands:...'
-    // Group 1: Nội dung trước '**' (Trang 0)
-    // Group 2: '**II. Report test tính năng các brands:...' (Trang 1 trở đi)
+    // Regex tìm chính xác mẫu: (Nội dung trước **) **(II. Report test tính năng các brands:...)
     const exactSplitRegex = /([\s\S]*?)\*\*(\s*II\. Report test tính năng các brands:[\s\S]*)/i;
 
     const match = text.match(exactSplitRegex);
     
     if (match && match.length === 3) {
-      // Nội dung trước dấu ** (Trang 0)
       reportTitle = match[1].trim(); 
-      
-      // Nội dung từ dấu ** trở đi (Trang 1+)
       mainReportContent = match[2];
 
-      // Loại bỏ dấu ** mở ở đầu mainReportContent (Vì Regex đã tách dấu ** ra khỏi Group 1)
-      // mainReportContent hiện tại là 'II. Report test tính năng các brands:...' và có thể chứa dấu ** đóng ở cuối.
-      
-      // Loại bỏ chính xác chuỗi 'II. Report test tính năng các brands:' khỏi mainReportContent để bắt đầu phân trang
-      
-      // Tách chuỗi '**II. Report test tính năng các brands:' ra khỏi phần nội dung chi tiết.
+      // Lấy phần nội dung chi tiết (sau 'II. Report test tính năng các brands:')
       const detailContent = mainReportContent.substring(splitMarker.length).trim();
       
-      // Ghép lại tiêu đề mục II. Report và nội dung chi tiết
+      // BƯỚC SỬA LỖI 1: Tái tạo lại tiêu đề mục II. in đậm (theo yêu cầu)
+      // và loại bỏ dấu ** đóng ở cuối nếu có.
       mainReportContent = `**${splitMarker}**\n${detailContent}`;
       
-      // Loại bỏ dấu ** đóng ở cuối nếu có (giả sử nó nằm ở cuối toàn bộ nội dung)
       if (mainReportContent.endsWith('**')) {
         mainReportContent = mainReportContent.slice(0, -2).trim();
       }
+
+      // BƯỚC SỬA LỖI 2: Loại bỏ toàn bộ các dấu ** khác trong nội dung chi tiết
+      // (ngoại trừ dấu ** cho tiêu đề mục II vừa được thêm vào) để tránh lỗi in đậm ngược.
       
+      // Tách nội dung để bảo toàn dấu ** của tiêu đề II
+      const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
+      
+      // Loại bỏ tất cả dấu ** trong phần chi tiết bug
+      const cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
+      
+      // Ghép lại (Tiêu đề mục II. in đậm + Nội dung đã làm sạch)
+      mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
+
     } else {
-      // Fallback: Nếu Regex không khớp, thì nội dung bị dồn.
       reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
       mainReportContent = text.trim();
     }
@@ -191,32 +191,26 @@ if (interaction.commandName === "report") {
     // ----------------------------------------------------
 
     // BƯỚC 2: Xử lý nội dung chính (từ 'II. Report test...')
-    // Để đảm bảo mục II. Report test tính năng các brands: vẫn nằm trong Trang 1 và được in đậm,
-    // ta không loại bỏ nó khỏi mainReportContent.
     const parts = splitMessagePreserveLinks(mainReportContent);
 
     // BƯỚC 3: Tạo Embeds
 
-    // Embed đầu tiên (Trang 0: Tiêu đề, Tổng quan và Link Domain I)
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
       description: reportTitle, 
       color: 0x00a2ff,
     };
 
-    // Các Embed cho phần nội dung chi tiết (Từ Trang 1 trở đi) - Không có phụ đề
     const contentEmbeds = parts.map((chunk, index) => ({
-      title: `📄 Trang ${index + 1}`, // Bắt đầu từ trang 1
+      title: `📄 Trang ${index + 1}`,
       description: chunk,
       color: 0x00a2ff,
     }));
 
-    const embeds = [firstEmbed, ...contentEmbeds]; // Gộp embed tiêu đề và các embed nội dung
+    const embeds = [firstEmbed, ...contentEmbeds]; 
 
-    // Gửi embed đầu tiên (Tiêu đề)
     await interaction.editReply({ embeds: [embeds[0]] });
 
-    // Gửi phần còn lại (Chi tiết Bug)
     for (let i = 1; i < embeds.length; i++) {
       await interaction.followUp({ embeds: [embeds[i]] });
     }
