@@ -33,9 +33,7 @@ const GAS_WEBHOOK_URL =
 // ====================================================================
 // Hàm 1: splitMessagePreserveLinks (Dành cho Embed - Giới hạn 3500)
 // ====================================================================
-const MAX_EMBED_LENGTH = 3500; 
-// Giảm giới hạn kiểm tra cho Trang 0 để dành chỗ cho Title và mục I, tránh cắt lửng.
-const MAX_CHUNK_LENGTH_SAFE = 3450; 
+const MAX_EMBED_LENGTH = 3500; 
 
 function splitMessagePreserveLinks(text) {
   const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH;
@@ -55,12 +53,11 @@ function splitMessagePreserveLinks(text) {
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i];
     
-    // Áp dụng giới hạn an toàn cho Chunk đầu tiên (Trang 0)
-    const currentLimit = (parts.length === 0) ? MAX_CHUNK_LENGTH_SAFE : MAX_CHUNK_LENGTH;
+    const currentLimit = MAX_CHUNK_LENGTH;
     
     if ((chunk + token).length > currentLimit) {
       if (chunk) {
-        // LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng khỏi nội dung/link (Quan trọng cho tính nhất quán)
+        // LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng khỏi nội dung/link
         const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
         const match = chunk.match(listPrefixRegex);
         
@@ -68,21 +65,18 @@ function splitMessagePreserveLinks(text) {
           const prefix = match[0];
           chunk = chunk.slice(0, chunk.length - prefix.length);
           token = prefix + token;
-          tokens[i] = token; 
-        } 
-        // **LOGIC ĐỂ ƯU TIÊN GIỮ KHỐI TIÊU ĐỀ (MỤC I, II) KHÔNG BỊ CẮT LỬNG:**
-        else if (token.includes('I.') || token.includes('II.')) { 
-            // Nếu token tiếp theo là tiêu đề mục I hoặc II (thường là token lớn),
-            // Cố gắng cắt tại vị trí xuống dòng gần nhất để đẩy toàn bộ mục đó xuống trang mới.
-            const lastNewline = chunk.lastIndexOf('\n');
-            if (lastNewline !== -1 && (currentLimit - lastNewline) < token.length + 50) {
-                // Nếu xuống dòng gần giới hạn, cắt tại đó
-                const remaining = chunk.substring(lastNewline).trim();
-                chunk = chunk.slice(0, lastNewline);
-                token = remaining + token;
-                tokens[i] = token;
-            }
-        }
+          tokens[i] = token; 
+        } 
+        // Logic an toàn: giữ các khối tiêu đề/danh sách con không bị cắt lửng
+        else if (token.trim().length > 1 && token.includes('\n')) { 
+            const lastNewline = chunk.lastIndexOf('\n');
+            if (lastNewline !== -1 && (currentLimit - lastNewline) < token.length + 50) {
+                const remaining = chunk.substring(lastNewline).trim();
+                chunk = chunk.slice(0, lastNewline);
+                token = remaining + token;
+                tokens[i] = token;
+            }
+        }
         
         parts.push(chunk);
       }
@@ -107,10 +101,9 @@ function splitMessagePreserveLinks(text) {
 // ====================================================================
 // Hàm 2: splitMessageAvoidCuttingLinks (Dành cho Tin nhắn thường - Giới hạn 2000)
 // ====================================================================
-const MAX_DISCORD_MESSAGE_LENGTH = 1990; 
+const MAX_DISCORD_MESSAGE_LENGTH = 1990; 
 
 function splitMessageAvoidCuttingLinks(text) {
-  // Sử dụng lại logic phân tách token an toàn từ hàm Embed, nhưng dùng giới hạn 1990
   const MAX_CHUNK_LENGTH = MAX_DISCORD_MESSAGE_LENGTH;
 
   // 1. Chuẩn hóa link (loại bỏ xuống dòng trong title)
@@ -121,7 +114,7 @@ function splitMessageAvoidCuttingLinks(text) {
   // 2. Tách chuỗi thành các token: link hoặc text thường
   const regex = /(\[.*?\]\([^)]+\))|([^\[]+)/gs;
   const tokens = [...text.matchAll(regex)].map((m) => m[0]);
-  
+  
   const parts = [];
   let chunk = "";
 
@@ -130,28 +123,21 @@ function splitMessageAvoidCuttingLinks(text) {
     
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
       if (chunk) {
-        // **LOGIC MỚI: NGĂN CHẶN CẮT DẤU ĐẦU DÒNG VÀO CHUNK TIẾP THEO**
-        // Kiểm tra xem chunk hiện tại có kết thúc bằng ký hiệu danh sách (\n + space + •/*/-) không
+        // LOGIC: NGĂN CHẶN CẮT DẤU ĐẦU DÒNG VÀO CHUNK TIẾP THEO
         const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
         const match = chunk.match(listPrefixRegex);
         
         if (match && token.startsWith('[')) {
-          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
           const prefix = match[0];
-          
-          // Cắt phần tiền tố khỏi chunk hiện tại
           chunk = chunk.slice(0, chunk.length - prefix.length);
-          
-          // Chuyển phần tiền tố lên đầu token tiếp theo
           token = prefix + token;
           tokens[i] = token; // Cập nhật token trong mảng
         }
-        // END LOGIC MỚI
         
         parts.push(chunk);
       }
       chunk = token;
-      
+      
       // Xử lý token quá dài (buộc phải cắt)
       while (chunk.length > MAX_CHUNK_LENGTH) {
         parts.push(chunk.substring(0, MAX_CHUNK_LENGTH));
@@ -209,10 +195,10 @@ client.once("ready", async () => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  // --- HÀM XỬ LÝ FORMAT CHUNG (Được dùng bởi cả /report và /report1) ---
+  // --- HÀM XỬ LÝ FORMAT CHUNG (TÁCH NỘI DUNG thành 2 PHẦN: Mục I và Mục II) ---
   const processReportContent = (text) => {
-    let reportTitle = "";
-    let mainReportContent = text;
+    let section1 = ""; // Tiêu đề + Mục I
+    let section2 = ""; // Mục II + Chi tiết
     
     const splitMarker = "II. Report test tính năng các brands:";
     
@@ -222,41 +208,38 @@ client.on("interactionCreate", async (interaction) => {
     const match = text.match(exactSplitRegex);
     
     if (match && match.length === 3) {
-      reportTitle = match[1].trim(); 
-      mainReportContent = match[2];
+      // Phần 1: Tiêu đề + Mục I (Loại bỏ các ký tự Markdown dư thừa)
+      section1 = match[1].trim().replace(/\*\*/g, '').trim(); 
+      
+      // Phần 2: Nội dung từ Mục II trở đi (Bao gồm dấu ** ban đầu)
+      let rawSection2 = match[2];
 
-      // Lấy phần nội dung chi tiết (sau 'II. Report test tính năng các brands:')
-      const detailContent = mainReportContent.substring(splitMarker.length).trim();
+      // Lấy phần nội dung chi tiết
+      const detailContent = rawSection2.substring(splitMarker.length).trim();
       
-      // Tái tạo tiêu đề mục II. in đậm và loại bỏ dấu ** đóng ở cuối nếu có.
-      mainReportContent = `**${splitMarker}**\n${detailContent}`;
+      // Làm sạch Markdown dư thừa trong phần chi tiết
+      let cleanedContent = detailContent.replace(/\*\*/g, '').trim();
       
-      if (mainReportContent.endsWith('**')) {
-        mainReportContent = mainReportContent.slice(0, -2).trim();
-      }
-
-      // Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
-      const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
-      let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
-      
-      // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ
-      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**');
+      // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ CON
+      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**'); 
+      cleanedContent = cleanedContent.replace(/^(Các brands đang có issue:)/m, '**$1**'); // Xử lý trường hợp không có 1.
       cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
       cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
       
-      mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
+      // Tái tạo Mục II với dấu ** chính xác ở đầu
+      section2 = `**${splitMarker}**\n${cleanedContent}`;
 
     } else {
-      // Fallback nếu Regex không khớp
-      reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
-      mainReportContent = text.trim();
+      // Fallback: Nếu không tìm thấy Mục II, coi như toàn bộ là Section 1
+      section1 = text.trim();
+      section2 = ""; 
     }
-    return { reportTitle, mainReportContent };
+    return { section1, section2 };
   };
   // -------------------------------------------------------------------------
 
   try {
-    // ===================== /report (DẠNG EMBED ĐÃ TỐI ƯU) =====================
+    // ===================== /report (DẠNG EMBED ĐÃ FIX CẮT MỤC I & II) =====================
 if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
@@ -264,28 +247,36 @@ if (interaction.commandName === "report") {
     const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
     let text = res.data || "❌ Không nhận được report từ GAS";
 
-    const { reportTitle, mainReportContent } = processReportContent(text);
+    if (text.startsWith("❌")) {
+      await interaction.editReply({ content: text });
+      return;
+    }
+    
+    // **TÁCH CHỦ ĐỘNG** Mục I và Mục II
+    const { section1, section2 } = processReportContent(text); 
 
-    // Gộp lại để phân trang thống nhất cho Embed
-    const fullContent = reportTitle + "\n" + mainReportContent;
-
-    // BƯỚC 2 & 3: Phân trang và Gửi Embeds (Dùng hàm PreserveLinks)
-    const parts = splitMessagePreserveLinks(fullContent);
-
+    // 1. Trang 0: Luôn chứa Tiêu đề + Mục I (section1)
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: parts[0], 
+      description: section1,
       color: 0x00a2ff,
     };
+    
+    const embeds = [firstEmbed];
 
-    const contentEmbeds = parts.slice(1).map((chunk, index) => ({
-      title: `📄 Trang ${index + 2}`, // Bắt đầu từ trang 2
-      description: chunk,
-      color: 0x00a2ff,
-    }));
+    // 2. Các trang tiếp theo: Dùng hàm cắt chuỗi an toàn cho Mục II (section2)
+    if (section2) {
+      const section2Parts = splitMessagePreserveLinks(section2);
 
-    const embeds = [firstEmbed, ...contentEmbeds]; 
-
+      section2Parts.forEach((chunk, index) => {
+        embeds.push({
+            title: `📄 Trang ${index + 2}`, // Bắt đầu từ trang 2
+            description: chunk,
+            color: 0x00a2ff,
+        });
+      });
+    }
+    
     await interaction.editReply({ embeds: [embeds[0]] });
 
     for (let i = 1; i < embeds.length; i++) {
@@ -305,16 +296,16 @@ if (interaction.commandName === "report") {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data || "❌ Không nhận được report từ GAS";
 
-        if (text.startsWith("❌")) {
-            await interaction.editReply({ content: text });
-            return;
-        }
+        if (text.startsWith("❌")) {
+            await interaction.editReply({ content: text });
+            return;
+        }
 
         // Xử lý format (in đậm tiêu đề, giữ hyperlink)
-        const { reportTitle, mainReportContent } = processReportContent(text);
+        const { section1, section2 } = processReportContent(text);
         
         // Gộp lại toàn bộ nội dung đã format
-        const fullFormattedText = reportTitle + "\n" + mainReportContent;
+        const fullFormattedText = section1 + "\n" + section2;
 
         // **SỬ DỤNG HÀM CHIA CHUỖI AN TOÀN CHO TIN NHẮN THƯỜNG (1990)**
         const parts = splitMessageAvoidCuttingLinks(fullFormattedText);
