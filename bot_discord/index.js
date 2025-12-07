@@ -163,24 +163,36 @@ if (interaction.commandName === "report") {
       // Lấy phần nội dung chi tiết (sau 'II. Report test tính năng các brands:')
       const detailContent = mainReportContent.substring(splitMarker.length).trim();
       
-      // BƯỚC SỬA LỖI 1: Tái tạo lại tiêu đề mục II. in đậm (theo yêu cầu)
-      // và loại bỏ dấu ** đóng ở cuối nếu có.
+      // BƯỚC SỬA LỖI 1: Tái tạo tiêu đề mục II. in đậm và loại bỏ dấu ** đóng ở cuối nếu có.
       mainReportContent = `**${splitMarker}**\n${detailContent}`;
       
       if (mainReportContent.endsWith('**')) {
         mainReportContent = mainReportContent.slice(0, -2).trim();
       }
 
-      // BƯỚC SỬA LỖI 2: Loại bỏ toàn bộ các dấu ** khác trong nội dung chi tiết
-      // (ngoại trừ dấu ** cho tiêu đề mục II vừa được thêm vào) để tránh lỗi in đậm ngược.
+      // BƯỚC SỬA LỖI 2: Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
       
       // Tách nội dung để bảo toàn dấu ** của tiêu đề II
       const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
       
-      // Loại bỏ tất cả dấu ** trong phần chi tiết bug
-      const cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
+      // 2a. Loại bỏ tất cả dấu ** không cần thiết trong phần chi tiết
+      let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
       
-      // Ghép lại (Tiêu đề mục II. in đậm + Nội dung đã làm sạch)
+      // 2b. ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ
+      // In đậm 'Các brands đang có issue:'
+      cleanedContent = cleanedContent.replace(
+        /^(Các brands đang có issue:)/m, 
+        '**$1**'
+      );
+      
+      // In đậm 'Tên Brand - PC'
+      // Ví dụ: MAY MẮN - PC, CHIVAS - PC, SINGHA - PC, CON VOI - PC, BUMBLE - PC, HOÀNG GIA - PC
+      cleanedContent = cleanedContent.replace(
+        /^([A-ZÀ-Ỹ\s]+ - PC)([\r\n]+)/gm, 
+        '**$1**$2'
+      );
+      
+      // 2c. Ghép lại (Tiêu đề mục II. in đậm + Nội dung đã làm sạch và in đậm có chọn lọc)
       mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
 
     } else {
@@ -190,10 +202,8 @@ if (interaction.commandName === "report") {
     
     // ----------------------------------------------------
 
-    // BƯỚC 2: Xử lý nội dung chính (từ 'II. Report test...')
+    // BƯỚC 2 & 3: Phân trang và Gửi Embeds (Giữ nguyên)
     const parts = splitMessagePreserveLinks(mainReportContent);
-
-    // BƯỚC 3: Tạo Embeds
 
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
