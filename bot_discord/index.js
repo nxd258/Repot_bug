@@ -196,7 +196,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   // --- HÀM XỬ LÝ FORMAT CHUNG (TÁCH NỘI DUNG thành 2 PHẦN: Mục I và Mục II) ---
-  const processReportContent = (text) => {
+const processReportContent = (text) => {
     let section1 = ""; // Tiêu đề + Mục I
     let section2 = ""; // Mục II + Chi tiết
     
@@ -208,34 +208,40 @@ client.on("interactionCreate", async (interaction) => {
     const match = text.match(exactSplitRegex);
     
     if (match && match.length === 3) {
-      // Phần 1: Tiêu đề + Mục I (Loại bỏ các ký tự Markdown dư thừa)
-      section1 = match[1].trim().replace(/\*\*/g, '').trim(); 
-      
-      // Phần 2: Nội dung từ Mục II trở đi (Bao gồm dấu ** ban đầu)
-      let rawSection2 = match[2];
+        // Phần 1: Tiêu đề + Mục I (Loại bỏ các ký tự Markdown dư thừa)
+        section1 = match[1].trim().replace(/\*\*/g, '').trim(); 
+        
+        // **BỔ SUNG LOGIC IN ĐẬM CHO PHẦN SECTION 1**
+        // In đậm dòng "Team gửi..."
+        section1 = section1.replace(/(Team gửi Anh\/Chị Report daily tối [\d-]+:)/i, '**$1**');
+        // In đậm dòng "I. Report access domain tối: Link"
+        section1 = section1.replace(/(I\. Report access domain tối: Link)/i, '**$1**');
+        
+        // Phần 2: Nội dung từ Mục II trở đi (Bao gồm dấu ** ban đầu)
+        let rawSection2 = match[2];
 
-      // Lấy phần nội dung chi tiết
-      const detailContent = rawSection2.substring(splitMarker.length).trim();
-      
-      // Làm sạch Markdown dư thừa trong phần chi tiết
-      let cleanedContent = detailContent.replace(/\*\*/g, '').trim();
-      
-      // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ CON
-      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**'); 
-      cleanedContent = cleanedContent.replace(/^(Các brands đang có issue:)/m, '**$1**'); // Xử lý trường hợp không có 1.
-      cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
-      cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
-      
-      // Tái tạo Mục II với dấu ** chính xác ở đầu
-      section2 = `**${splitMarker}**\n${cleanedContent}`;
+        // Lấy phần nội dung chi tiết
+        const detailContent = rawSection2.substring(splitMarker.length).trim();
+        
+        // Làm sạch Markdown dư thừa trong phần chi tiết
+        let cleanedContent = detailContent.replace(/\*\*/g, '').trim();
+        
+        // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ CON TRONG SECTION 2
+        cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**'); 
+        cleanedContent = cleanedContent.replace(/^(Các brands đang có issue:)/m, '**$1**');
+        cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
+        cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
+        
+        // Tái tạo Mục II với dấu ** chính xác ở đầu
+        section2 = `**${splitMarker}**\n${cleanedContent}`;
 
     } else {
-      // Fallback: Nếu không tìm thấy Mục II, coi như toàn bộ là Section 1
-      section1 = text.trim();
-      section2 = ""; 
+        // Fallback: Nếu không tìm thấy Mục II, coi như toàn bộ là Section 1
+        section1 = text.trim();
+        section2 = ""; 
     }
     return { section1, section2 };
-  };
+};
   // -------------------------------------------------------------------------
 
   try {
