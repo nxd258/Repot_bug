@@ -136,7 +136,7 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     // ===================== /report (ĐÃ SỬA DỤNG HÀM CHUẨN) =====================
- if (interaction.commandName === "report") {
+if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
   try {
@@ -144,36 +144,55 @@ client.on("interactionCreate", async (interaction) => {
     let text = res.data || "❌ Không nhận được report từ GAS";
 
     // ----------------------------------------------------
-    // BƯỚC 1: Tìm điểm chia chính xác giữa Tiêu đề (Trang 0) và Chi tiết (Trang 1 trở đi)
+    // BƯỚC 1: Tìm điểm chia chính xác
     
     let reportTitle = "";
     let mainReportContent = text;
     
-    // Điểm neo chia nội dung
+    // Điểm neo chia nội dung chi tiết
     const splitMarker = "II. Report test tính năng các brands:";
-    const splitIndex = text.indexOf(splitMarker);
     
-    if (splitIndex !== -1) {
-      // Nội dung từ đầu đến ngay trước 'II...' là Tiêu đề (Trang 0)
-      reportTitle = text.substring(0, splitIndex).trim();
-      
-      // Nội dung từ 'II...' trở đi là Nội dung chi tiết (Trang 1)
-      mainReportContent = text.substring(splitIndex).trim();
+    // Regex tìm chính xác mẫu '**II. Report test tính năng các brands:...'
+    // Group 1: Nội dung trước '**' (Trang 0)
+    // Group 2: '**II. Report test tính năng các brands:...' (Trang 1 trở đi)
+    const exactSplitRegex = /([\s\S]*?)\*\*(\s*II\. Report test tính năng các brands:[\s\S]*)/i;
 
-      // Khắc phục: Sau khi cắt, đảm bảo không có ký tự Markdown dư thừa nào
-      // đang nằm ở đầu mainReportContent (ví dụ: các dấu *)
-      // Thêm logic loại bỏ các ký tự Markdown phổ biến ở đầu nếu có.
-      mainReportContent = mainReportContent.replace(/^[\s\r\n]*[*_`~]+/, '').trim();
+    const match = text.match(exactSplitRegex);
+    
+    if (match && match.length === 3) {
+      // Nội dung trước dấu ** (Trang 0)
+      reportTitle = match[1].trim(); 
+      
+      // Nội dung từ dấu ** trở đi (Trang 1+)
+      mainReportContent = match[2];
+
+      // Loại bỏ dấu ** mở ở đầu mainReportContent (Vì Regex đã tách dấu ** ra khỏi Group 1)
+      // mainReportContent hiện tại là 'II. Report test tính năng các brands:...' và có thể chứa dấu ** đóng ở cuối.
+      
+      // Loại bỏ chính xác chuỗi 'II. Report test tính năng các brands:' khỏi mainReportContent để bắt đầu phân trang
+      
+      // Tách chuỗi '**II. Report test tính năng các brands:' ra khỏi phần nội dung chi tiết.
+      const detailContent = mainReportContent.substring(splitMarker.length).trim();
+      
+      // Ghép lại tiêu đề mục II. Report và nội dung chi tiết
+      mainReportContent = `**${splitMarker}**\n${detailContent}`;
+      
+      // Loại bỏ dấu ** đóng ở cuối nếu có (giả sử nó nằm ở cuối toàn bộ nội dung)
+      if (mainReportContent.endsWith('**')) {
+        mainReportContent = mainReportContent.slice(0, -2).trim();
+      }
+      
     } else {
-      // Fallback: Nếu không tìm thấy điểm cắt.
+      // Fallback: Nếu Regex không khớp, thì nội dung bị dồn.
       reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
-      // Nếu không cắt được, ta vẫn cần đảm bảo phần text ban đầu không bị in đậm
-      mainReportContent = text.replace(/^[\s\r\n]*[*_`~]+/, '').trim();
+      mainReportContent = text.trim();
     }
     
     // ----------------------------------------------------
 
     // BƯỚC 2: Xử lý nội dung chính (từ 'II. Report test...')
+    // Để đảm bảo mục II. Report test tính năng các brands: vẫn nằm trong Trang 1 và được in đậm,
+    // ta không loại bỏ nó khỏi mainReportContent.
     const parts = splitMessagePreserveLinks(mainReportContent);
 
     // BƯỚC 3: Tạo Embeds
@@ -181,7 +200,7 @@ client.on("interactionCreate", async (interaction) => {
     // Embed đầu tiên (Trang 0: Tiêu đề, Tổng quan và Link Domain I)
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: reportTitle, // Chứa toàn bộ nội dung từ đầu đến hết Link
+      description: reportTitle, 
       color: 0x00a2ff,
     };
 
