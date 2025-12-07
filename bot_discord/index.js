@@ -136,7 +136,7 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     // ===================== /report (ĐÃ SỬA DỤNG HÀM CHUẨN) =====================
-  if (interaction.commandName === "report") {
+ if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
   try {
@@ -144,36 +144,25 @@ client.on("interactionCreate", async (interaction) => {
     let text = res.data || "❌ Không nhận được report từ GAS";
 
     // ----------------------------------------------------
-    // BƯỚC 1: Tách phần tiêu đề báo cáo ra khỏi nội dung chính
+    // BƯỚC 1: Tìm điểm chia chính xác giữa Tiêu đề (Trang 0) và Chi tiết (Trang 1 trở đi)
     
-    // Tách toàn bộ nội dung từ đầu đến hết dòng chứa "I. Report access domain tối: Link"
-    // Regex: Bắt đầu từ đầu file (^) và dừng NGAY SAU khi tìm thấy chuỗi 'I. Report access domain tối: Link'
-    const endOfTitleRegex = /([\s\S]*I\. Report access domain tối: Link\s*\n*)/i;
     let reportTitle = "";
     let mainReportContent = text;
     
-    const match = text.match(endOfTitleRegex);
-
-    if (match) {
-      // match[1] là toàn bộ phần từ đầu đến hết Link
-      reportTitle = match[1].trim();
+    // Tìm vị trí bắt đầu của phần chi tiết bug
+    const splitMarker = "II. Report test tính năng các brands:";
+    const splitIndex = text.indexOf(splitMarker);
+    
+    if (splitIndex !== -1) {
+      // Nội dung từ đầu đến ngay trước 'II...' là Tiêu đề
+      reportTitle = text.substring(0, splitIndex).trim();
       
-      // Phần còn lại là nội dung chi tiết (từ 'II. Report test tính năng các brands:...')
-      mainReportContent = text.substring(match[1].length).trim();
+      // Nội dung từ 'II...' trở đi là Nội dung chi tiết
+      mainReportContent = text.substring(splitIndex).trim();
     } else {
-      // Fallback nếu cấu trúc thay đổi
-      const lines = text.split('\n');
-      // Tìm chỉ mục của dòng bắt đầu 'II. Report test tính năng các brands:'
-      const splitIndex = lines.findIndex(line => line.trim().startsWith('II. Report test tính năng các brands:'));
-      
-      if (splitIndex !== -1) {
-        reportTitle = lines.slice(0, splitIndex).join('\n').trim();
-        mainReportContent = lines.slice(splitIndex).join('\n').trim();
-      } else {
-        // Không tìm thấy điểm cắt: coi toàn bộ là nội dung chính (tránh lỗi)
-        reportTitle = "Không tìm thấy điểm cắt tiêu đề chính xác. Dữ liệu có thể bị dồn.";
-        mainReportContent = text.trim();
-      }
+      // Trường hợp không tìm thấy: Giữ nguyên toàn bộ nội dung là mainReportContent
+      reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
+      // mainReportContent = text; (Đã gán ở trên)
     }
     
     // ----------------------------------------------------
