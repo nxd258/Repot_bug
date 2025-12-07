@@ -136,7 +136,7 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     // ===================== /report (ĐÃ SỬA DỤNG HÀM CHUẨN) =====================
-   if (interaction.commandName === "report") {
+  if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
   try {
@@ -144,26 +144,36 @@ client.on("interactionCreate", async (interaction) => {
     let text = res.data || "❌ Không nhận được report từ GAS";
 
     // ----------------------------------------------------
-    // BƯỚC 1: Tách phần tiêu đề báo cáo ra khỏi nội dung chính, bao gồm cả I. Link
+    // BƯỚC 1: Tách phần tiêu đề báo cáo ra khỏi nội dung chính
     
-    // Regex tìm phần tiêu đề: Bắt đầu từ 'DAILY BUG REPORT' và kết thúc sau 'I. Report access domain tối: Link'
-    // Sử dụng non-greedy match (.*?) và [\s\S]*? để lấy mọi ký tự, bao gồm cả xuống dòng.
-    const titleRegex = /^(DAILY BUG REPORT[\s\S]*?\n*I\. Report access domain tối: Link\s*\n*)/i;
+    // Tách toàn bộ nội dung từ đầu đến hết dòng chứa "I. Report access domain tối: Link"
+    // Regex: Bắt đầu từ đầu file (^) và dừng NGAY SAU khi tìm thấy chuỗi 'I. Report access domain tối: Link'
+    const endOfTitleRegex = /([\s\S]*I\. Report access domain tối: Link\s*\n*)/i;
     let reportTitle = "";
     let mainReportContent = text;
     
-    const match = text.match(titleRegex);
+    const match = text.match(endOfTitleRegex);
 
     if (match) {
-      // match[1] là toàn bộ phần tiêu đề (đến hết Link)
+      // match[1] là toàn bộ phần từ đầu đến hết Link
       reportTitle = match[1].trim();
-      // Phần còn lại là từ 'II. Report test tính năng các brands:...'
+      
+      // Phần còn lại là nội dung chi tiết (từ 'II. Report test tính năng các brands:...')
       mainReportContent = text.substring(match[1].length).trim();
     } else {
-      // Fallback: Nếu cấu trúc thay đổi, lấy 5 dòng đầu làm tiêu đề
+      // Fallback nếu cấu trúc thay đổi
       const lines = text.split('\n');
-      reportTitle = lines.slice(0, 5).join('\n');
-      mainReportContent = lines.slice(5).join('\n').trim();
+      // Tìm chỉ mục của dòng bắt đầu 'II. Report test tính năng các brands:'
+      const splitIndex = lines.findIndex(line => line.trim().startsWith('II. Report test tính năng các brands:'));
+      
+      if (splitIndex !== -1) {
+        reportTitle = lines.slice(0, splitIndex).join('\n').trim();
+        mainReportContent = lines.slice(splitIndex).join('\n').trim();
+      } else {
+        // Không tìm thấy điểm cắt: coi toàn bộ là nội dung chính (tránh lỗi)
+        reportTitle = "Không tìm thấy điểm cắt tiêu đề chính xác. Dữ liệu có thể bị dồn.";
+        mainReportContent = text.trim();
+      }
     }
     
     // ----------------------------------------------------
@@ -176,12 +186,11 @@ client.on("interactionCreate", async (interaction) => {
     // Embed đầu tiên (Trang 0: Tiêu đề, Tổng quan và Link Domain I)
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: reportTitle, // Chứa cả phần Link Domain I.
+      description: reportTitle, // Chứa toàn bộ nội dung từ đầu đến hết Link
       color: 0x00a2ff,
     };
 
-    // Các Embed cho phần nội dung chi tiết (Từ Trang 1 trở đi)
-    // Đã bỏ phụ đề " - Chi tiết Bug"
+    // Các Embed cho phần nội dung chi tiết (Từ Trang 1 trở đi) - Không có phụ đề
     const contentEmbeds = parts.map((chunk, index) => ({
       title: `📄 Trang ${index + 1}`, // Bắt đầu từ trang 1
       description: chunk,
