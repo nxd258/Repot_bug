@@ -137,18 +137,8 @@ client.once("ready", async () => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  try {
-    // ===================== /report (DẠNG EMBED ĐÃ TỐI ƯU) =====================
-if (interaction.commandName === "report") {
-  await interaction.reply("⏳ Đang lấy report...");
-
-  try {
-    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
-    let text = res.data || "❌ Không nhận được report từ GAS";
-
-    // ----------------------------------------------------
-    // BƯỚC 1: Tách Tiêu đề (Trang 0) và Nội dung Chi tiết (Trang 1+)
-    
+  // --- HÀM XỬ LÝ FORMAT CHUNG (Được dùng bởi cả /report và /report1) ---
+  const processReportContent = (text) => {
     let reportTitle = "";
     let mainReportContent = text;
     
@@ -166,63 +156,58 @@ if (interaction.commandName === "report") {
       // Lấy phần nội dung chi tiết (sau 'II. Report test tính năng các brands:')
       const detailContent = mainReportContent.substring(splitMarker.length).trim();
       
-      // BƯỚC SỬA LỖI 1: Tái tạo tiêu đề mục II. in đậm và loại bỏ dấu ** đóng ở cuối nếu có.
+      // Tái tạo tiêu đề mục II. in đậm và loại bỏ dấu ** đóng ở cuối nếu có.
       mainReportContent = `**${splitMarker}**\n${detailContent}`;
       
       if (mainReportContent.endsWith('**')) {
         mainReportContent = mainReportContent.slice(0, -2).trim();
       }
 
-      // BƯỚC SỬA LỖI 2: Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
-      
-     // Tách nội dung để bảo toàn dấu ** của tiêu đề II
+      // Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
       const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
-      
-      // 2a. Loại bỏ tất cả dấu ** không cần thiết trong phần chi tiết (để tránh lỗi in đậm ngược)
       let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
       
-      // 2b. ÁP DỤNG IN ĐẬM CHO TẤT CẢ CÁC TIÊU ĐỀ
+      // ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ
+      cleanedContent = cleanedContent.replace(/^(1\. Các brands đang có issue:)/m, '**$1**');
+      cleanedContent = cleanedContent.replace(/^(2\. Các brands không có issue:)/m, '**$1**');
+      cleanedContent = cleanedContent.replace(/^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, '**$1**$2');
       
-      // In đậm '1. Các brands đang có issue:'
-      cleanedContent = cleanedContent.replace(
-        /^(1\. Các brands đang có issue:)/m, 
-        '**$1**'
-      );
-      
-      // In đậm '2. Các brands không có issue:'
-      cleanedContent = cleanedContent.replace(
-        /^(2\. Các brands không có issue:)/m, 
-        '**$1**'
-      );
-      
-      // In đậm 'Tên Brand - PC'
-      // Regex tìm: Bất kỳ ký tự chữ cái/số/khoảng trắng nào theo sau là ' - PC'
-      cleanedContent = cleanedContent.replace(
-        /^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, 
-        '**$1**$2'
-      );
-      
-      // 2c. Ghép lại (Tiêu đề mục II. in đậm + Nội dung đã làm sạch và in đậm có chọn lọc)
       mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
 
     } else {
+      // Fallback nếu Regex không khớp
       reportTitle = "Không tìm thấy điểm neo 'II. Report test tính năng các brands:'. Dữ liệu có thể bị dồn.";
       mainReportContent = text.trim();
     }
-    
-    // ----------------------------------------------------
+    return { reportTitle, mainReportContent };
+  };
+  // -------------------------------------------------------------------------
 
-    // BƯỚC 2 & 3: Phân trang và Gửi Embeds (Giữ nguyên)
-    const parts = splitMessagePreserveLinks(mainReportContent);
+  try {
+    // ===================== /report (DẠNG EMBED ĐÃ TỐI ƯU) =====================
+if (interaction.commandName === "report") {
+  await interaction.reply("⏳ Đang lấy report...");
+
+  try {
+    const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+    let text = res.data || "❌ Không nhận được report từ GAS";
+
+    const { reportTitle, mainReportContent } = processReportContent(text);
+
+    // Gộp lại để phân trang thống nhất
+    const fullContent = reportTitle + "\n" + mainReportContent;
+
+    // BƯỚC 2 & 3: Phân trang và Gửi Embeds
+    const parts = splitMessagePreserveLinks(fullContent);
 
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: reportTitle, 
+      description: parts[0], 
       color: 0x00a2ff,
     };
 
-    const contentEmbeds = parts.map((chunk, index) => ({
-      title: `📄 Trang ${index + 1}`,
+    const contentEmbeds = parts.slice(1).map((chunk, index) => ({
+      title: `📄 Trang ${index + 2}`, // Bắt đầu từ trang 2
       description: chunk,
       color: 0x00a2ff,
     }));
@@ -240,7 +225,7 @@ if (interaction.commandName === "report") {
     await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
-    // ===================== /report1 (DẠNG TEXT THÔ) =====================
+    // ===================== /report1 (DẠNG TEXT THÔ ĐÃ CÓ FORMAT) =====================
     if (interaction.commandName === "report1") {
       await interaction.reply("⏳ Đang lấy report (Text thô)...");
       
@@ -248,21 +233,23 @@ if (interaction.commandName === "report") {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data || "❌ Không nhận được report từ GAS";
 
-        // Loại bỏ tất cả dấu ** để đảm bảo không có lỗi định dạng
-        text = text.replace(/\*\*/g, '');
+        // Xử lý format (in đậm tiêu đề)
+        const { reportTitle, mainReportContent } = processReportContent(text);
+        
+        // Gộp lại toàn bộ nội dung đã format (có tiêu đề và phần chi tiết)
+        const fullFormattedText = reportTitle + "\n" + mainReportContent;
 
-        // Chia text thành các đoạn nhỏ (mỗi đoạn tối đa 2000 ký tự Discord)
-        const MAX_MESSAGE_LENGTH = 1900; // Dùng 1900 để đảm bảo an toàn với ```text```
-        // Sử dụng Regex để chia thành các đoạn text, bao gồm cả ký tự xuống dòng
-        const parts = text.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
+        // Phân đoạn text thành các tin nhắn dưới 2000 ký tự (1900 để an toàn)
+        const MAX_MESSAGE_LENGTH = 1900; 
+        const parts = fullFormattedText.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
 
         if (parts.length > 0) {
-          // Gửi phần đầu tiên dưới dạng chỉnh sửa phản hồi ban đầu, bọc trong code block
-          await interaction.editReply({ content: `\`\`\`text\n${parts[0]}\n\`\`\`` });
+          // Gửi phần đầu tiên, bọc trong code block (cho dễ copy)
+          await interaction.editReply({ content: `\`\`\`markdown\n${parts[0]}\n\`\`\`` });
 
-          // Gửi phần còn lại dưới dạng tin nhắn tiếp theo, bọc trong code block
+          // Gửi phần còn lại, bọc trong code block
           for (let i = 1; i < parts.length; i++) {
-            await interaction.followUp({ content: `\`\`\`text\n${parts[i]}\n\`\`\`` });
+            await interaction.followUp({ content: `\`\`\`markdown\n${parts[i]}\n\`\`\`` });
           }
         } else {
           await interaction.editReply("❌ Report rỗng.");
