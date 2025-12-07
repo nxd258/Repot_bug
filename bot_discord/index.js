@@ -92,6 +92,7 @@ function splitMessagePreserveLinks(text) {
 const MAX_DISCORD_MESSAGE_LENGTH = 1990; 
 
 function splitMessageAvoidCuttingLinks(text) {
+  // Sử dụng lại logic phân tách token an toàn từ hàm Embed, nhưng dùng giới hạn 1990
   const MAX_CHUNK_LENGTH = MAX_DISCORD_MESSAGE_LENGTH;
 
   // 1. Chuẩn hóa link (loại bỏ xuống dòng trong title)
@@ -106,10 +107,29 @@ function splitMessageAvoidCuttingLinks(text) {
   const parts = [];
   let chunk = "";
 
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    let token = tokens[i]; // Sử dụng let để có thể thay đổi token
+    
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
-      
       if (chunk) {
+        // **LOGIC MỚI: NGĂN CHẶN CẮT DẤU ĐẦU DÒNG VÀO CHUNK TIẾP THEO**
+        // Kiểm tra xem chunk hiện tại có kết thúc bằng ký hiệu danh sách (\n + space + •/*/-) không
+        const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
+        const match = chunk.match(listPrefixRegex);
+        
+        if (match && token.startsWith('[')) {
+          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
+          const prefix = match[0];
+          
+          // Cắt phần tiền tố khỏi chunk hiện tại
+          chunk = chunk.slice(0, chunk.length - prefix.length);
+          
+          // Chuyển phần tiền tố lên đầu token tiếp theo
+          token = prefix + token;
+          tokens[i] = token; // Cập nhật token trong mảng
+        }
+        // END LOGIC MỚI
+        
         parts.push(chunk);
       }
       chunk = token;
@@ -128,7 +148,6 @@ function splitMessageAvoidCuttingLinks(text) {
   if (chunk) parts.push(chunk);
   return parts;
 }
-
 
 // Đăng ký slash commands
 client.once("ready", async () => {
