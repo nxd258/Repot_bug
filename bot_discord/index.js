@@ -95,8 +95,6 @@ function splitMessagePreserveLinks(text) {
 }
 
 
-
-
 // Đăng ký slash commands
 client.once("ready", async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
@@ -104,7 +102,7 @@ client.once("ready", async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName("report")
-      .setDescription("Lấy báo cáo bug mới nhất (dạng Embed)"), // Cập nhật mô tả
+      .setDescription("Lấy báo cáo bug mới nhất (dạng Embed)"),
 // === BỔ SUNG LỆNH /report1 ===
     new SlashCommandBuilder() 
       .setName("report1")
@@ -250,18 +248,19 @@ if (interaction.commandName === "report") {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data || "❌ Không nhận được report từ GAS";
 
-        // Thay thế các dấu ** bằng ký tự trống để loại bỏ in đậm
+        // Loại bỏ tất cả dấu ** để đảm bảo không có lỗi định dạng
         text = text.replace(/\*\*/g, '');
 
         // Chia text thành các đoạn nhỏ (mỗi đoạn tối đa 2000 ký tự Discord)
-        const MAX_MESSAGE_LENGTH = 2000;
+        const MAX_MESSAGE_LENGTH = 1900; // Dùng 1900 để đảm bảo an toàn với ```text```
+        // Sử dụng Regex để chia thành các đoạn text, bao gồm cả ký tự xuống dòng
         const parts = text.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
 
         if (parts.length > 0) {
-          // Gửi phần đầu tiên dưới dạng chỉnh sửa phản hồi ban đầu
+          // Gửi phần đầu tiên dưới dạng chỉnh sửa phản hồi ban đầu, bọc trong code block
           await interaction.editReply({ content: `\`\`\`text\n${parts[0]}\n\`\`\`` });
 
-          // Gửi phần còn lại dưới dạng tin nhắn tiếp theo
+          // Gửi phần còn lại dưới dạng tin nhắn tiếp theo, bọc trong code block
           for (let i = 1; i < parts.length; i++) {
             await interaction.followUp({ content: `\`\`\`text\n${parts[i]}\n\`\`\`` });
           }
@@ -280,7 +279,21 @@ if (interaction.commandName === "report") {
         title: "ℹ️ DATA INFO",
         color: 3447003,
         fields: [
-// ... (nội dung /info giữ nguyên)
+          {
+            name: "1. File data all bug",
+            value:
+              "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
+          },
+          {
+            name: "2. Link download file CSV",
+            value:
+              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20(RBDA,RBMM,RBBK,RB18,RBCV,RBHG,RBTA88,RBTL,VOD,CHIV,XIT,BU88,KBET,AM,RUM,TIKI,DU,HO,BOM,GA,LAZ,TARO,VAB,LMN,SB88,S88,NEON,ROOS,SHOP,Q88,TH01)%20AND%20created%20%3E%3D%20-18h%20AND%20type%20%3D%20Bug%20AND%20status%20!%3D%20Resolved%20ORDER%20BY%20created%20DESC)",
+          },
+          {
+            name: "3. Link data daily function",
+            value:
+              "[Link](https://docs.google.com/spreadsheets/d/1KKnCq7666uE-Z-wE7JW0raE5OKh5dHKPX8eDlSGmlWs/edit?gid=476546611#gid=476546611)",
+          },
         ],
         footer: { text: "Team gửi info" },
         timestamp: new Date().toISOString(),
@@ -291,7 +304,27 @@ if (interaction.commandName === "report") {
 
     // ===================== /data =====================
     if (interaction.commandName === "data") {
-// ... (nội dung /data giữ nguyên)
+      const file = interaction.options.getAttachment("file");
+      if (!file) {
+        await interaction.reply("❌ Vui lòng chọn file!");
+        return;
+      }
+
+      await interaction.reply(
+        `⏳ Đang gửi file ${file.name} lên Google Web App...`
+      );
+
+      try {
+        const res = await axios.post(GAS_WEBHOOK_URL, {
+          cmd: "data",
+          fileUrl: file.url,
+        });
+
+        await interaction.editReply(res.data.message || "✅ Dữ liệu được lưu!");
+      } catch (err) {
+        console.error(err);
+        await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
+      }
     }
   } catch (err) {
     console.error("Lỗi interaction:", err.message);
