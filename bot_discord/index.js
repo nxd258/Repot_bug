@@ -172,23 +172,30 @@ if (interaction.commandName === "report") {
 
       // BƯỚC SỬA LỖI 2: Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
       
-      // Tách nội dung để bảo toàn dấu ** của tiêu đề II
+     // Tách nội dung để bảo toàn dấu ** của tiêu đề II
       const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
       
-      // 2a. Loại bỏ tất cả dấu ** không cần thiết trong phần chi tiết
+      // 2a. Loại bỏ tất cả dấu ** không cần thiết trong phần chi tiết (để tránh lỗi in đậm ngược)
       let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
       
-      // 2b. ÁP DỤNG IN ĐẬM CHO CÁC TIÊU ĐỀ
-      // In đậm 'Các brands đang có issue:'
+      // 2b. ÁP DỤNG IN ĐẬM CHO TẤT CẢ CÁC TIÊU ĐỀ
+      
+      // In đậm '1. Các brands đang có issue:'
       cleanedContent = cleanedContent.replace(
-        /^(Các brands đang có issue:)/m, 
+        /^(1\. Các brands đang có issue:)/m, 
+        '**$1**'
+      );
+      
+      // In đậm '2. Các brands không có issue:'
+      cleanedContent = cleanedContent.replace(
+        /^(2\. Các brands không có issue:)/m, 
         '**$1**'
       );
       
       // In đậm 'Tên Brand - PC'
-      // Ví dụ: MAY MẮN - PC, CHIVAS - PC, SINGHA - PC, CON VOI - PC, BUMBLE - PC, HOÀNG GIA - PC
+      // Regex tìm: Bất kỳ ký tự chữ cái/số/khoảng trắng nào theo sau là ' - PC'
       cleanedContent = cleanedContent.replace(
-        /^([A-ZÀ-Ỹ\s]+ - PC)([\r\n]+)/gm, 
+        /^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, 
         '**$1**$2'
       );
       
