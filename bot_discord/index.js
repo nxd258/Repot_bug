@@ -31,7 +31,7 @@ const GAS_WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbwPPRtBxzURgpw2WxStHEBRtt9E3TKM9S6vpAGlq1V8kSH6KY2z6c_DrKWoEKY36Mj4/exec";
 
 // Hàm cắt text dài thành từng đoạn nhỏ, bảo toàn Markdown links
-const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
+const MAX_EMBED_LENGTH = 3500; // An toàn cho Embed
 
 function splitMessagePreserveLinks(text) {
   // Sử dụng hằng số an toàn đã định nghĩa
@@ -57,19 +57,12 @@ function splitMessagePreserveLinks(text) {
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
       if (chunk) {
         // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
-        // Kiểm tra xem chunk có kết thúc bằng ký hiệu danh sách không (\n + space + •/*/-)
-        // và token tiếp theo có phải là nội dung danh sách (bắt đầu bằng link '[')
         const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
         const match = chunk.match(listPrefixRegex);
         
         if (match && token.startsWith('[')) {
-          // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
           const prefix = match[0];
-          
-          // Cắt phần tiền tố khỏi chunk (trang cũ)
           chunk = chunk.slice(0, chunk.length - prefix.length);
-          
-          // Chuyển phần tiền tố lên đầu token (trang mới)
           token = prefix + token;
           tokens[i] = token; // Cập nhật token trong mảng
         }
@@ -106,7 +99,7 @@ client.once("ready", async () => {
 // === BỔ SUNG LỆNH /report1 ===
     new SlashCommandBuilder() 
       .setName("report1")
-      .setDescription("Lấy báo cáo bug mới nhất (dạng Text thô, dễ Copy/Paste)"),
+      .setDescription("Lấy báo cáo bug mới nhất (dạng Tin nhắn thường)"),
 // =============================
     new SlashCommandBuilder()
       .setName("info")
@@ -194,10 +187,10 @@ if (interaction.commandName === "report") {
 
     const { reportTitle, mainReportContent } = processReportContent(text);
 
-    // Gộp lại để phân trang thống nhất
+    // Gộp lại để phân trang thống nhất cho Embed
     const fullContent = reportTitle + "\n" + mainReportContent;
 
-    // BƯỚC 2 & 3: Phân trang và Gửi Embeds
+    // BƯỚC 2 & 3: Phân trang và Gửi Embeds (Dùng hàm PreserveLinks)
     const parts = splitMessagePreserveLinks(fullContent);
 
     const firstEmbed = {
@@ -225,31 +218,32 @@ if (interaction.commandName === "report") {
     await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
-    // ===================== /report1 (DẠNG TEXT THÔ ĐÃ CÓ FORMAT) =====================
+    // ===================== /report1 (DẠNG TIN NHẮN THƯỜNG ĐÃ CÓ FORMAT) =====================
     if (interaction.commandName === "report1") {
-      await interaction.reply("⏳ Đang lấy report (Text thô)...");
+      await interaction.reply("⏳ Đang lấy report (Tin nhắn thường)...");
       
       try {
         const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
         let text = res.data || "❌ Không nhận được report từ GAS";
 
-        // Xử lý format (in đậm tiêu đề)
+        // Xử lý format (in đậm tiêu đề, giữ hyperlink)
         const { reportTitle, mainReportContent } = processReportContent(text);
         
-        // Gộp lại toàn bộ nội dung đã format (có tiêu đề và phần chi tiết)
+        // Gộp lại toàn bộ nội dung đã format
         const fullFormattedText = reportTitle + "\n" + mainReportContent;
 
-        // Phân đoạn text thành các tin nhắn dưới 2000 ký tự (1900 để an toàn)
-        const MAX_MESSAGE_LENGTH = 1900; 
+        // Phân đoạn text thành các tin nhắn dưới 2000 ký tự (giới hạn tin nhắn Discord)
+        const MAX_MESSAGE_LENGTH = 1990; // Dùng 1990 để an toàn
+        // Sử dụng Regex để chia thành các đoạn text
         const parts = fullFormattedText.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
 
         if (parts.length > 0) {
-          // Gửi phần đầu tiên, bọc trong code block (cho dễ copy)
-          await interaction.editReply({ content: `\`\`\`markdown\n${parts[0]}\n\`\`\`` });
+          // Gửi phần đầu tiên, DƯỚI DẠNG TIN NHẮN THƯỜNG
+          await interaction.editReply({ content: parts[0] });
 
-          // Gửi phần còn lại, bọc trong code block
+          // Gửi phần còn lại, DƯỚI DẠNG TIN NHẮN THƯỜNG
           for (let i = 1; i < parts.length; i++) {
-            await interaction.followUp({ content: `\`\`\`markdown\n${parts[i]}\n\`\`\`` });
+            await interaction.followUp({ content: parts[i] });
           }
         } else {
           await interaction.editReply("❌ Report rỗng.");
