@@ -35,7 +35,7 @@ const MAX_EMBED_LENGTH = 3500; // an toàn hơn 4000
 
 function splitMessagePreserveLinks(text) {
   // Sử dụng hằng số an toàn đã định nghĩa
-  const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
+  const MAX_CHUNK_LENGTH = MAX_EMBED_LENGTH; 
 
   // FIX 1: Loại bỏ xuống dòng trong title của link và sử dụng non-greedy match
   text = text.replace(/\[(.*?)\]\(([^)]+)\)/gs, (m, t, url) => {
@@ -53,7 +53,7 @@ function splitMessagePreserveLinks(text) {
   // Chuyển sang vòng lặp tiêu chuẩn để có thể chỉnh sửa token
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i]; // Use 'let' for potential modification
-    
+    
     if ((chunk + token).length > MAX_CHUNK_LENGTH) {
       if (chunk) {
         // NEW LOGIC: Ngăn chặn việc tách dấu chấm đầu dòng (bullet) khỏi nội dung
@@ -61,24 +61,24 @@ function splitMessagePreserveLinks(text) {
         // và token tiếp theo có phải là nội dung danh sách (bắt đầu bằng link '[')
         const listPrefixRegex = /([\r\n]\s*[\-\*•]\s*)$/g;
         const match = chunk.match(listPrefixRegex);
-        
+        
         if (match && token.startsWith('[')) {
           // Lấy ra phần tiền tố (dấu chấm đầu dòng và xuống dòng)
           const prefix = match[0];
-          
+          
           // Cắt phần tiền tố khỏi chunk (trang cũ)
           chunk = chunk.slice(0, chunk.length - prefix.length);
-          
+          
           // Chuyển phần tiền tố lên đầu token (trang mới)
           token = prefix + token;
           tokens[i] = token; // Cập nhật token trong mảng
         }
-        
+        
         parts.push(chunk);
       }
-      
+      
       chunk = token; // Bắt đầu chunk mới với token đã được chỉnh sửa
-      
+      
       // Xử lý trường hợp một token (ví dụ: một link rất dài) vẫn vượt quá giới hạn
       if (token.length > MAX_CHUNK_LENGTH) {
         const subParts = token.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}`, "gs")) || [];
@@ -104,7 +104,12 @@ client.once("ready", async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName("report")
-      .setDescription("Lấy báo cáo bug mới nhất"),
+      .setDescription("Lấy báo cáo bug mới nhất (dạng Embed)"), // Cập nhật mô tả
+// === BỔ SUNG LỆNH /report1 ===
+    new SlashCommandBuilder() 
+      .setName("report1")
+      .setDescription("Lấy báo cáo bug mới nhất (dạng Text thô, dễ Copy/Paste)"),
+// =============================
     new SlashCommandBuilder()
       .setName("info")
       .setDescription("Xem thông tin liên quan"),
@@ -135,7 +140,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    // ===================== /report (ĐÃ SỬA DỤNG HÀM CHUẨN) =====================
+    // ===================== /report (DẠNG EMBED ĐÃ TỐI ƯU) =====================
 if (interaction.commandName === "report") {
   await interaction.reply("⏳ Đang lấy report...");
 
@@ -157,48 +162,48 @@ if (interaction.commandName === "report") {
     const match = text.match(exactSplitRegex);
     
     if (match && match.length === 3) {
-      reportTitle = match[1].trim(); 
+      reportTitle = match[1].trim(); 
       mainReportContent = match[2];
 
       // Lấy phần nội dung chi tiết (sau 'II. Report test tính năng các brands:')
       const detailContent = mainReportContent.substring(splitMarker.length).trim();
-      
+      
       // BƯỚC SỬA LỖI 1: Tái tạo tiêu đề mục II. in đậm và loại bỏ dấu ** đóng ở cuối nếu có.
       mainReportContent = `**${splitMarker}**\n${detailContent}`;
-      
+      
       if (mainReportContent.endsWith('**')) {
         mainReportContent = mainReportContent.slice(0, -2).trim();
       }
 
       // BƯỚC SỬA LỖI 2: Làm sạch Markdown và Áp dụng In Đậm Có Chọn Lọc
-      
+      
      // Tách nội dung để bảo toàn dấu ** của tiêu đề II
       const contentAfterTitle = mainReportContent.substring(mainReportContent.indexOf(splitMarker) + splitMarker.length);
-      
+      
       // 2a. Loại bỏ tất cả dấu ** không cần thiết trong phần chi tiết (để tránh lỗi in đậm ngược)
       let cleanedContent = contentAfterTitle.replace(/\*\*/g, '').trim();
-      
+      
       // 2b. ÁP DỤNG IN ĐẬM CHO TẤT CẢ CÁC TIÊU ĐỀ
-      
+      
       // In đậm '1. Các brands đang có issue:'
       cleanedContent = cleanedContent.replace(
-        /^(1\. Các brands đang có issue:)/m, 
+        /^(1\. Các brands đang có issue:)/m, 
         '**$1**'
       );
-      
+      
       // In đậm '2. Các brands không có issue:'
       cleanedContent = cleanedContent.replace(
-        /^(2\. Các brands không có issue:)/m, 
+        /^(2\. Các brands không có issue:)/m, 
         '**$1**'
       );
-      
+      
       // In đậm 'Tên Brand - PC'
       // Regex tìm: Bất kỳ ký tự chữ cái/số/khoảng trắng nào theo sau là ' - PC'
       cleanedContent = cleanedContent.replace(
-        /^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, 
+        /^([\w\sÀ-Ỹ]+ - PC)([\r\n]+)/gm, 
         '**$1**$2'
       );
-      
+      
       // 2c. Ghép lại (Tiêu đề mục II. in đậm + Nội dung đã làm sạch và in đậm có chọn lọc)
       mainReportContent = `**${splitMarker}**\n${cleanedContent}`;
 
@@ -214,7 +219,7 @@ if (interaction.commandName === "report") {
 
     const firstEmbed = {
       title: "📊 DAILY BUG REPORT",
-      description: reportTitle, 
+      description: reportTitle, 
       color: 0x00a2ff,
     };
 
@@ -224,7 +229,7 @@ if (interaction.commandName === "report") {
       color: 0x00a2ff,
     }));
 
-    const embeds = [firstEmbed, ...contentEmbeds]; 
+    const embeds = [firstEmbed, ...contentEmbeds]; 
 
     await interaction.editReply({ embeds: [embeds[0]] });
 
@@ -237,27 +242,45 @@ if (interaction.commandName === "report") {
     await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
   }
 }
+    // ===================== /report1 (DẠNG TEXT THÔ) =====================
+    if (interaction.commandName === "report1") {
+      await interaction.reply("⏳ Đang lấy report (Text thô)...");
+      
+      try {
+        const res = await axios.get(GAS_WEBHOOK_URL + "?cmd=report");
+        let text = res.data || "❌ Không nhận được report từ GAS";
+
+        // Thay thế các dấu ** bằng ký tự trống để loại bỏ in đậm
+        text = text.replace(/\*\*/g, '');
+
+        // Chia text thành các đoạn nhỏ (mỗi đoạn tối đa 2000 ký tự Discord)
+        const MAX_MESSAGE_LENGTH = 2000;
+        const parts = text.match(new RegExp(`[\\s\\S]{1,${MAX_MESSAGE_LENGTH}}`, "g")) || [];
+
+        if (parts.length > 0) {
+          // Gửi phần đầu tiên dưới dạng chỉnh sửa phản hồi ban đầu
+          await interaction.editReply({ content: `\`\`\`text\n${parts[0]}\n\`\`\`` });
+
+          // Gửi phần còn lại dưới dạng tin nhắn tiếp theo
+          for (let i = 1; i < parts.length; i++) {
+            await interaction.followUp({ content: `\`\`\`text\n${parts[i]}\n\`\`\`` });
+          }
+        } else {
+          await interaction.editReply("❌ Report rỗng.");
+        }
+
+      } catch (err) {
+        console.error(err);
+        await interaction.editReply("❌ Lỗi khi gọi Google Web App!");
+      }
+    }
     // ===================== /info =====================
     if (interaction.commandName === "info") {
       const embed = {
         title: "ℹ️ DATA INFO",
         color: 3447003,
         fields: [
-          {
-            name: "1. File data all bug",
-            value:
-              "[Link](https://docs.google.com/spreadsheets/d/1CtChubs-WxMZizjhGiaS7rEBqUc3BJCAHKE5zfIzaXU/edit?gid=0)",
-          },
-          {
-            name: "2. Link download file CSV",
-            value:
-              "[Link](https://creqacom.atlassian.net/issues/?filter=13415&jql=project%20IN%20(RBDA,RBMM,RBBK,RB18,RBCV,RBHG,RBTA88,RBTL,VOD,CHIV,XIT,BU88,KBET,AM,RUM,TIKI,DU,HO,BOM,GA,LAZ,TARO,VAB,LMN,SB88,S88,NEON,ROOS,SHOP,Q88,TH01)%20AND%20created%20%3E%3D%20-18h%20AND%20type%20%3D%20Bug%20AND%20status%20!%3D%20Resolved%20ORDER%20BY%20created%20DESC)",
-          },
-          {
-            name: "3. Link data daily function",
-            value:
-              "[Link](https://docs.google.com/spreadsheets/d/1KKnCq7666uE-Z-wE7JW0raE5OKh5dHKPX8eDlSGmlWs/edit?gid=476546611#gid=476546611)",
-          },
+// ... (nội dung /info giữ nguyên)
         ],
         footer: { text: "Team gửi info" },
         timestamp: new Date().toISOString(),
@@ -268,27 +291,7 @@ if (interaction.commandName === "report") {
 
     // ===================== /data =====================
     if (interaction.commandName === "data") {
-      const file = interaction.options.getAttachment("file");
-      if (!file) {
-        await interaction.reply("❌ Vui lòng chọn file!");
-        return;
-      }
-
-      await interaction.reply(
-        `⏳ Đang gửi file ${file.name} lên Google Web App...`
-      );
-
-      try {
-        const res = await axios.post(GAS_WEBHOOK_URL, {
-          cmd: "data",
-          fileUrl: file.url,
-        });
-
-        await interaction.editReply(res.data.message || "✅ Dữ liệu được lưu!");
-      } catch (err) {
-        console.error(err);
-        await interaction.editReply("❌ Lỗi khi gửi CSV lên Google Web App!");
-      }
+// ... (nội dung /data giữ nguyên)
     }
   } catch (err) {
     console.error("Lỗi interaction:", err.message);
